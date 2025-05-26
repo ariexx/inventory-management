@@ -366,102 +366,88 @@
             });
         });
 
-        // Daily Sales Chart
+        // Daily Sales Chart - remove the duplicate chart creation
         var dailySalesChartCanvas = document.getElementById('dailySalesChart').getContext('2d');
 
-        var dailySalesData = {
-            labels: @json($dailySalesLabels),
-            datasets: [
-                {
-                    label: 'Total Barang Terjual',
-                    borderColor: '#ffc107',
-                    backgroundColor: 'rgba(255, 193, 7, 0.2)',
-                    data: @json($dailySalesData),
-                    borderWidth: 2,
-                    fill: true,
-                    pointRadius: 3,
-                    pointBackgroundColor: '#ffc107',
-                    tension: 0.4,
-                    yAxisID: 'y',
-                    type: 'line'
+        var dailySalesChart = new Chart(dailySalesChartCanvas, {
+            type: 'line',
+            data: {
+                labels: @json($dailySalesLabels),
+                datasets: [
+                    {
+                        label: 'Total Barang Terjual',
+                        data: @json($dailySalesData),
+                        backgroundColor: 'rgba(255, 193, 7, 0.2)',
+                        borderColor: '#ffc107',
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        pointBackgroundColor: '#ffc107',
+                        fill: true,
+                        tension: 0.4
+                    },
+                    {
+                        label: 'Omset (Dalam Ribuan Rp)',
+                        data: @json($dailyTurnoverData).map(value => value / 1000),
+                        backgroundColor: 'rgba(40, 167, 69, 0.2)',
+                        borderColor: '#28a745',
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        pointBackgroundColor: '#28a745',
+                        fill: true,
+                        tension: 0.4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
                 },
-                {
-                    label: 'Omset (Dalam Rp 10,000)',
-                    borderColor: '#28a745',
-                    backgroundColor: 'rgba(40, 167, 69, 0.2)',
-                    data: @json($dailyTurnoverData).map(value => value / 10000),
-                    borderWidth: 2,
-                    fill: true,
-                    pointRadius: 3,
-                    pointBackgroundColor: '#28a745',
-                    tension: 0.4,
-                    yAxisID: 'y1',
-                    type: 'line'
-                }
-            ]
-        };
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
 
-        var dailySalesOptions = {
-            maintainAspectRatio: false,
-            responsive: true,
-            hover: {
-                mode: 'nearest',
-                intersect: true
-            },
-            scales: {
-                x: {
-                    grid: {
-                        display: false
-                    }
-                },
-                y: {
-                    position: 'left',
-                    title: {
-                        display: true,
-                        text: 'Jumlah Barang'
-                    },
-                    grid: {
-                        color: 'rgba(0, 0, 0, 0.05)'
-                    }
-                },
-                y1: {
-                    position: 'right',
-                    title: {
-                        display: true,
-                        text: 'Omset (Rp 10,000)'
-                    },
-                    grid: {
-                        display: false
-                    }
-                }
-            },
-            plugins: {
-                legend: {
-                    position: 'top',
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            var label = context.dataset.label || '';
-                            if (label) {
-                                label += ': ';
+                                if (label) {
+                                    label += ': ';
+                                }
+
+                                if (context.datasetIndex === 0) {
+                                    label += context.raw.toFixed(0) + ' items';
+                                } else {
+                                    label += 'Rp ' + (context.raw * 1000).toLocaleString('id-ID');
+                                }
+
+                                return label;
                             }
-                            if (context.datasetIndex === 0) {
-                                label += context.raw.toFixed(0) + ' items';
-                            } else {
-                                label += 'Rp ' + (context.raw * 10000).toLocaleString('id-ID');
-                            }
-                            return label;
                         }
                     }
                 }
             }
-        };
-
-        new Chart(dailySalesChartCanvas, {
-            type: 'bar',
-            data: dailySalesData,
-            options: dailySalesOptions
         });
+
+            // Search functionality
+            $("input[name='table_search']").on('keyup', function() {
+                var value = $(this).val().toLowerCase();
+                $("table tbody tr").filter(function () {
+                    $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
+                });
+            });
     </script>
 @endsection

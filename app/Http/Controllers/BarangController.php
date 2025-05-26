@@ -38,6 +38,8 @@ class BarangController extends Controller
             'stok' => 'required|integer|min:0',
             'minimal_stok' => 'required|integer|min:0',
             'satuan' => 'required|string|max:50',
+            'keterangan' => 'nullable|string|max:255',
+            'harga_jual' => 'required|numeric|min:0',
         ]);
 
         Barang::create($request->all());

@@ -70,7 +70,7 @@
     </p>
 @stop
 
-@section('css')
+@section('styles')
 <style>
     .login-page {
         background-image: url('/vendor/adminlte/dist/img/background.jpg');

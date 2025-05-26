@@ -54,6 +54,10 @@
                                     <td>{{ $barang->minimal_stok }} {{ $barang->satuan }}</td>
                                 </tr>
                                 <tr>
+                                    <th>Harga Jual</th>
+                                    <td>Rp {{ number_format($barang->harga_jual, 0, ',', '.') }}</td>
+                                </tr>
+                                <tr>
                                     <th>Satuan</th>
                                     <td>{{ $barang->satuan }}</td>
                                 </tr>

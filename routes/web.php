@@ -28,6 +28,15 @@ Route::middleware('guest')->group(function () {
 Route::middleware(['auth', 'level:admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
 
+    // Penjualan
+    Route::resource('penjualan', App\Http\Controllers\PenjualanController::class)->except('show');
+
+    // Penjualan Laporan
+    Route::get('penjualan/laporan', [App\Http\Controllers\PenjualanController::class, 'laporan'])->name('penjualan.laporan');
+
+    // Penjualan Laporan Stok
+    Route::get('penjualan/laporan-stok', [App\Http\Controllers\PenjualanController::class, 'laporanStok'])->name('penjualan.laporan-stok');
+
     // Data Barang
     Route::resource('barang', BarangController::class);
 

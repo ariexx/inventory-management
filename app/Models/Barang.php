@@ -21,6 +21,7 @@ class Barang extends Model
         'minimal_stok',
         'satuan',
         'keterangan',
+        'harga_jual', // Added field for harga jual
     ];
 
     public function kategori(): BelongsTo

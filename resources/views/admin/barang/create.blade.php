@@ -59,6 +59,14 @@
                             @enderror
                         </div>
 
+                        <div class="form-group">
+                            <label for="harga_beli">Harga Jual</label>
+                            <input type="number" class="form-control @error('harga_jual') is-invalid @enderror" id="harga_jual" name="harga_jual" value="{{ old('harga_jual', 0) }}" min="0" required>
+                            @error('harga_jual')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="form-group">

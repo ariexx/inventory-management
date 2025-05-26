@@ -47,6 +47,7 @@
                         <th>Nama Barang</th>
                         <th>Kategori</th>
                         <th>Stok</th>
+                        <th>Harga Jual</th>
                         <th>Minimal Stok</th>
                         <th>Satuan</th>
                         <th width="15%">Aksi</th>
@@ -60,6 +61,7 @@
                             <td>{{ $item->nama }}</td>
                             <td>{{ $item->kategori->nama ?? 'Tidak Ada' }}</td>
                             <td class="font-weight-bold">{{ $item->stok }}</td>
+                            <td>Rp {{ number_format($item->harga_jual, 0, ',', '.') }}</td>
                             <td>{{ $item->minimal_stok }}</td>
                             <td>{{ $item->satuan }}</td>
                             <td>

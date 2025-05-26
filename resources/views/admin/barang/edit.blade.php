@@ -63,7 +63,7 @@
                         </div>
 
                         <div class="row">
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <div class="form-group">
                                     <label for="stok">Stok</label>
                                     <input type="number" class="form-control @error('stok') is-invalid @enderror" id="stok" name="stok" value="{{ old('stok', $barang->stok) }}" min="0" required>
@@ -72,7 +72,16 @@
                                     @enderror
                                 </div>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="harga_jual">Harga Jual (Rp)</label>
+                                    <input type="number" class="form-control @error('harga_jual') is-invalid @enderror" id="harga_jual" name="harga_jual" value="{{ old('harga_jual', $barang->harga_jual) }}" min="0" required>
+                                    @error('harga_jual')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                            </div>
+                            <div class="col-md-4">
                                 <div class="form-group">
                                     <label for="minimal_stok">Minimal Stok</label>
                                     <input type="number" class="form-control @error('minimal_stok') is-invalid @enderror" id="minimal_stok" name="minimal_stok" value="{{ old('minimal_stok', $barang->minimal_stok) }}" min="0" required>

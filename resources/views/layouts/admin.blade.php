@@ -130,6 +130,42 @@
                             <p>Laporan Barang Keluar</p>
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a href="{{ route('admin.penjualan.index') }}" class="nav-link {{ request()->routeIs('admin.penjualan.*') ? 'active' : '' }}">
+                            <i class="nav-icon fas fa-cash-register"></i>
+                            <p>Penjualan</p>
+                        </a>
+                    </li>
+
+                    <li class="nav-item {{ request()->routeIs('admin.penjualan.laporan*') ? 'menu-open' : '' }}">
+                        <a href="#" class="nav-link {{ request()->routeIs('admin.penjualan.laporan*') ? 'active' : '' }}">
+                            <i class="nav-icon fas fa-chart-bar"></i>
+                            <p>
+                                Laporan
+                                <i class="right fas fa-angle-left"></i>
+                            </p>
+                        </a>
+                        <ul class="nav nav-treeview">
+                            <li class="nav-item">
+                                <a href="{{ route('admin.penjualan.laporan') }}" class="nav-link {{ request()->routeIs('admin.penjualan.laporan') && !request('periode') || request('periode') == 'harian' ? 'active' : '' }}">
+                                    <i class="far fa-circle nav-icon"></i>
+                                    <p>Laporan Harian</p>
+                                </a>
+                            </li>
+{{--                            <li class="nav-item">--}}
+{{--                                <a href="{{ route('admin.penjualan.laporan', ['periode' => 'bulanan']) }}" class="nav-link {{ request()->routeIs('admin.penjualan.laporan') && request('periode') == 'bulanan' ? 'active' : '' }}">--}}
+{{--                                    <i class="far fa-circle nav-icon"></i>--}}
+{{--                                    <p>Laporan Bulanan</p>--}}
+{{--                                </a>--}}
+{{--                            </li>--}}
+                            <li class="nav-item">
+                                <a href="{{ route('admin.penjualan.laporan-stok') }}" class="nav-link {{ request()->routeIs('admin.penjualan.laporan-stok') ? 'active' : '' }}">
+                                    <i class="far fa-circle nav-icon"></i>
+                                    <p>Laporan Stok</p>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
                 </ul>
             </nav>
             <!-- /.sidebar-menu -->
