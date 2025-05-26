@@ -84,6 +84,13 @@
                     </li>
 
                     <li class="nav-item">
+                        <a href="{{ route('admin.supplier.index') }}" class="nav-link {{ request()->routeIs('admin.supplier.*') ? 'active' : '' }}">
+                            <i class="nav-icon fas fa-bahai"></i>
+                            <p>Data Supplier</p>
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
                         <a href="{{ route('admin.barang.index') }}" class="nav-link {{ request()->routeIs('admin.barang.*') ? 'active' : '' }}">
                             <i class="nav-icon fas fa-boxes"></i>
                             <p>Data Barang</p>

@@ -55,6 +55,9 @@ Route::middleware(['auth', 'level:admin'])->prefix('admin')->name('admin.')->gro
 
     // Kategori Barang
     Route::resource('kategori', App\Http\Controllers\KategoriBarangController::class);
+
+    // Supplier Management
+    Route::resource('supplier', App\Http\Controllers\SupplierController::class);
 });
 
 // Staff Routes (has limited access)
