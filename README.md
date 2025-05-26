@@ -51,7 +51,7 @@ A comprehensive inventory management system built with Laravel and AdminLTE. Thi
 
 1. Clone the repository
    ```
-   git clone https://github.com/yourusername/inventory-management.git
+   git clone https://github.com/ariexx/inventory-management.git
    ```
 
 2. Install dependencies
