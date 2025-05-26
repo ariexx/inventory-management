@@ -102,6 +102,13 @@
                             <p>Barang Keluar</p>
                         </a>
                     </li>
+
+                    <li class="nav-item">
+                        <a href="{{ route('staff.stok-koreksi.index') }}" class="nav-link {{ request()->routeIs('staff.stok-koreksi.*') ? 'active' : '' }}">
+                            <i class="nav-icon fas fa-balance-scale"></i>
+                            <p>Koreksi Stok</p>
+                        </a>
+                    </li>
                 </ul>
             </nav>
             <!-- /.sidebar-menu -->

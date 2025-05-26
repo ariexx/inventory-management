@@ -56,6 +56,10 @@ Route::middleware(['auth', 'level:staff,admin'])->prefix('staff')->name('staff.'
     Route::get('/barang', [BarangController::class, 'staffIndex'])->name('barang.index');
     Route::get('/barang-masuk', [BarangMasukController::class, 'staffIndex'])->name('barang-masuk.index');
     Route::get('/barang-keluar', [BarangKeluarController::class, 'staffIndex'])->name('barang-keluar.index');
+
+    // Stock Correction
+    Route::get('/stok-koreksi', [App\Http\Controllers\StokKoreksiController::class, 'index'])->name('stok-koreksi.index');
+    Route::post('/stok-koreksi', [App\Http\Controllers\StokKoreksiController::class, 'store'])->name('stok-koreksi.store');
 });
 
 // Manager Routes (can see everything, edit some things)
