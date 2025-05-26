@@ -28,6 +28,9 @@ Route::middleware('guest')->group(function () {
 Route::middleware(['auth', 'level:admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
 
+    // User Management
+    Route::resource('users', App\Http\Controllers\UserController::class);
+
     // Penjualan
     Route::resource('penjualan', App\Http\Controllers\PenjualanController::class)->except('show');
 

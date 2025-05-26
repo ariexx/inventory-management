@@ -118,6 +118,13 @@
                         </a>
                     </li>
 
+                    <li class="nav-item">
+                        <a href="{{ route('admin.users.index') }}" class="nav-link {{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
+                            <i class="nav-icon fas fa-user"></i>
+                            <p>Data User</p>
+                        </a>
+                    </li>
+
                     <li class="nav-header">LAPORAN</li>
                     <li class="nav-item">
                         <a href="{{ route('admin.laporan.stok') }}" class="nav-link {{ request()->routeIs('admin.laporan.stok') ? 'active' : '' }}">
