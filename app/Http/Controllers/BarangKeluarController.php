@@ -43,6 +43,7 @@ class BarangKeluarController extends Controller
             'barang_id' => 'required|exists:barang,id',
             'jumlah' => 'required|integer|min:1',
             'tanggal' => 'required|date',
+            'harga_jual' => 'required|numeric|min:0',
             'tujuan' => 'nullable|string|max:100',
             'penerima' => 'nullable|string|max:100',
         ]);
@@ -103,6 +104,7 @@ class BarangKeluarController extends Controller
             'barang_id' => 'required|exists:barang,id',
             'jumlah' => 'required|integer|min:1',
             'tanggal' => 'required|date',
+            'harga_jual' => 'required|numeric|min:0',
             'tujuan' => 'nullable|string|max:100',
             'penerima' => 'nullable|string|max:100',
         ]);

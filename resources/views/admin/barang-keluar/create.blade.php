@@ -101,6 +101,22 @@
                         </div>
 
                         <div class="form-group">
+                            <label for="harga_jual">Harga Jual</label>
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text">Rp</span>
+                                </div>
+                                <input type="number" class="form-control @error('harga_jual') is-invalid @enderror"
+                                       id="harga_jual" name="harga_jual" value="{{ old('harga_jual', 0) }}" min="0" step="0.01">
+                            </div>
+                            @error('harga_jual')
+                            <div class="invalid-feedback">
+                                {{ $message }}
+                            </div>
+                            @enderror
+                        </div>
+
+                        <div class="form-group">
                             <label for="keterangan">Keterangan</label>
                             <textarea class="form-control @error('keterangan') is-invalid @enderror" id="keterangan" name="keterangan" rows="3">{{ old('keterangan') }}</textarea>
                             @error('keterangan')

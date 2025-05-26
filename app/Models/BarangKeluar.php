@@ -20,6 +20,7 @@ class BarangKeluar extends Model
         'tujuan',
         'penerima',
         'keterangan',
+        'harga_jual'
     ];
 
     protected $casts = [

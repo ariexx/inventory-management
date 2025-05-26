@@ -64,7 +64,9 @@ Route::middleware(['auth', 'level:staff,admin'])->prefix('staff')->name('staff.'
 
 // Manager Routes (can see everything, edit some things)
 Route::middleware(['auth', 'level:manager,admin'])->prefix('manager')->name('manager.')->group(function () {
-    Route::get('/dashboard', [AdminController::class, 'managerDashboard'])->name('dashboard');
+//    Route::get('/dashboard', [AdminController::class, 'managerDashboard'])->name('dashboard');
+    Route::get('/dashboard', [App\Http\Controllers\ManagerDashboardController::class, 'index'])->name('dashboard');
+
 
     // Resource routes with limitations
     Route::resource('barang', BarangController::class)->except(['destroy']);
