@@ -1,61 +1,136 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Inventory Management System
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A comprehensive inventory management system built with Laravel and AdminLTE. This application helps businesses track inventory levels, orders, sales, and deliveries with role-based access control for different user types.
 
-## About Laravel
+## Features
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- **Dashboard Analytics**
+    - Admin: Full system overview with detailed analytics
+    - Manager: Business metrics with trend analysis
+    - Staff: Daily operational data focused on immediate tasks
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- **Inventory Management**
+    - Complete product catalog with detailed information
+    - Stock level tracking with low stock alerts
+    - Categorization system for better organization
+    - Barcode/SKU support for quick identification
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- **Transaction Tracking**
+    - Record incoming inventory (purchases, returns)
+    - Track outgoing inventory (sales, transfers)
+    - Document transaction history with timestamps
+    - Monitor inventory movements by date ranges
 
-## Learning Laravel
+- **User Management**
+    - Role-based access control (Admin, Manager, Staff)
+    - Permission-based features and views
+    - User activity logging and auditing
+    - Secure authentication system
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- **Reporting**
+    - Stock level reports
+    - Incoming/outgoing inventory reports
+    - Transaction history reports
+    - Custom date range filtering
+    - Export capabilities (CSV, PDF)
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+- **Category Management**
+    - Create, edit, delete product categories
+    - Associate products with multiple categories
+    - Track items by category for better inventory analysis
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Tech Stack
 
-## Laravel Sponsors
+- **Backend**: Laravel (PHP)
+- **Frontend**: Bootstrap, jQuery, AdminLTE
+- **Database**: MySQL
+- **Authentication**: Laravel's built-in auth with custom middleware
+- **UI Components**: [jeroennoten/laravel-adminlte](https://github.com/jeroennoten/Laravel-AdminLTE)
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## Installation
 
-### Premium Partners
+1. Clone the repository
+   ```
+   git clone https://github.com/yourusername/inventory-management.git
+   ```
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+2. Install dependencies
+   ```
+   composer install
+   npm install
+   ```
 
-## Contributing
+3. Copy environment file and configure database
+   ```
+   cp .env.example .env
+   ```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+4. Generate application key
+   ```
+   php artisan key:generate
+   ```
 
-## Code of Conduct
+5. Run database migrations and seed
+   ```
+   php artisan migrate --seed
+   ```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+6. Start development server
+   ```
+   php artisan serve
+   ```
 
-## Security Vulnerabilities
+## User Roles
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+1. **Admin**
+    - Has full access to all features
+    - Can manage users, permissions and system settings
+    - Can create, update, and delete all data
+
+2. **Manager**
+    - Has access to reporting and analytics
+    - Can view and edit most data
+    - Cannot delete critical information
+    - Can manage inventory levels
+
+3. **Staff**
+    - Has limited access to view inventory
+    - Can record incoming and outgoing inventory
+    - Has access to daily operational data only
+
+## How to Contribute
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature-branch`)
+3. Commit your changes (`git commit -m 'Add new feature'`)
+4. Push to the branch (`git push origin feature-branch`)
+5. Open a Pull Request
+
+### Contribution Guidelines
+
+- Follow PSR-12 coding standards
+- Write tests for new features
+- Update documentation for any changes
+- Keep pull requests focused on a single feature or bug fix
+- Clearly describe the purpose of your pull request
+
+## Improvement Areas
+
+- Add barcode scanning functionality
+- Implement email notifications for low stock
+- Create mobile-responsive views for warehouse staff
+- Add supplier management system
+- Implement advanced search capabilities
+- Add multi-language support
+- Create API endpoints for integration with other systems
+- Improve data visualization with charts and graphs
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- [Laravel](https://laravel.com/) - The web framework used
+- [AdminLTE](https://adminlte.io/) - Dashboard template
+- [jeroennoten/laravel-adminlte](https://github.com/jeroennoten/Laravel-AdminLTE) - Laravel AdminLTE integration
