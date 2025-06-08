@@ -6,7 +6,6 @@ use App\Models\Barang;
 use App\Models\Penjualan;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class PenjualanController extends Controller
@@ -29,6 +28,7 @@ class PenjualanController extends Controller
     public function create()
     {
         $barangs = Barang::where('stok', '>', 0)->get();
+
         return view('admin.penjualan.create', compact('barangs'));
     }
 
@@ -42,20 +42,19 @@ class PenjualanController extends Controller
             'jumlah' => 'required|integer|min:1',
             'tanggal' => 'required|date',
             'nama_pembeli' => 'nullable|string|max:255',
-            'keterangan' => 'nullable|string'
+            'keterangan' => 'nullable|string',
         ]);
-
 
         // Get the barang
         $barang = Barang::findOrFail($request->barang_id);
 
         // Check stock availability
         if ($barang->stok < $request->jumlah) {
-            return back()->with('error', 'Stok tidak mencukupi! Stok tersedia: ' . $barang->stok);
+            return back()->with('error', 'Stok tidak mencukupi! Stok tersedia: '.$barang->stok);
         }
 
         // Set the transaction code
-        $kodeTrx = 'TRX-' . date('Ymd') . '-' . Str::random(5);
+        $kodeTrx = 'TRX-'.date('Ymd').'-'.Str::random(5);
 
         // Get the price (either from hidden field or directly from model)
         $hargaSatuan = $request->input('harga_satuan_hidden') ?? $barang->harga_jual;
@@ -162,5 +161,26 @@ class PenjualanController extends Controller
         return view('admin.penjualan.laporan-stok', compact(
             'barangs', 'kritisList', 'rendahList', 'amanList'
         ));
+    }
+
+    /**
+     * Generate invoice for a specific sale.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function invoice(Penjualan $penjualan)
+    {
+        // Load the related barang model
+        $penjualan->load('barang');
+
+        // Get company info (you might want to store this in config or settings table)
+        $companyInfo = [
+            'name' => config('app.name', 'Inventory Management'),
+            'address' => config('app.address', 'Jl. Contoh Alamat No. 123, Jakarta'),
+            'phone' => config('app.phone', '021-12345678'),
+            'email' => config('app.email', 'example@inventory.com'),
+        ];
+
+        return view('admin.penjualan.invoice', compact('penjualan', 'companyInfo'));
     }
 }

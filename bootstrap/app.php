@@ -13,6 +13,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
             'level' => \App\Http\Middleware\CheckUserLevel::class,
+            'record.login' => \App\Http\Middleware\RecordLoginActivity::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

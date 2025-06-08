@@ -1,12 +1,12 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BarangController;
-use App\Http\Controllers\BarangMasukController;
 use App\Http\Controllers\BarangKeluarController;
+use App\Http\Controllers\BarangMasukController;
 use App\Http\Controllers\LaporanController;
+use Illuminate\Support\Facades\Route;
 
 // Authentication Routes
 Route::get('/', function () {
@@ -15,7 +15,7 @@ Route::get('/', function () {
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
-    Route::post('/login', [AuthController::class, 'login']);
+    Route::middleware('record.login')->post('/login', [AuthController::class, 'login']);
     Route::get('/forgot-password', function () {
         return view('auth.forgot-password');
     })->name('password.request');
@@ -61,6 +61,13 @@ Route::middleware(['auth', 'level:admin'])->prefix('admin')->name('admin.')->gro
 
     // Supplier Management
     Route::resource('supplier', App\Http\Controllers\SupplierController::class);
+
+    // Invoice Route for Penjualan
+    Route::get('/penjualan/{penjualan}/invoice', [App\Http\Controllers\PenjualanController::class, 'invoice'])->name('admin.penjualan.invoice');
+
+    // Login Activity routes (admin only)
+    Route::get('/admin/login-activities', [App\Http\Controllers\LoginActivityController::class, 'index'])
+        ->name('admin.login-activities.index');
 });
 
 // Staff Routes (has limited access)
@@ -79,9 +86,8 @@ Route::middleware(['auth', 'level:staff,admin'])->prefix('staff')->name('staff.'
 
 // Manager Routes (can see everything, edit some things)
 Route::middleware(['auth', 'level:manager,admin'])->prefix('manager')->name('manager.')->group(function () {
-//    Route::get('/dashboard', [AdminController::class, 'managerDashboard'])->name('dashboard');
+    //    Route::get('/dashboard', [AdminController::class, 'managerDashboard'])->name('dashboard');
     Route::get('/dashboard', [App\Http\Controllers\ManagerDashboardController::class, 'index'])->name('dashboard');
-
 
     // Resource routes with limitations
     Route::resource('barang', BarangController::class)->except(['destroy']);
@@ -101,7 +107,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', function () {
         $user = auth()->user();
 
-        return match($user->level) {
+        return match ($user->level) {
             'admin' => redirect()->route('admin.dashboard'),
             'manager' => redirect()->route('manager.dashboard'),
             'staff' => redirect()->route('staff.dashboard'),
@@ -110,4 +116,10 @@ Route::middleware(['auth'])->group(function () {
     })->name('dashboard');
 
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+});
+
+// Apply record login middleware to necessary routes
+Route::middleware(['web', 'auth', 'record.login'])->group(function () {
+    // Add your authenticated routes here if they aren't already in a group
+    // Or you can apply this middleware in the RouteServiceProvider to the desired route groups
 });

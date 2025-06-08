@@ -80,11 +80,15 @@
                                         data-keterangan="{{ $item->keterangan ?? '-' }}">
                                     <i class="fas fa-eye"></i>
                                 </button>
+                                <a href="{{ route('admin.admin.penjualan.invoice', $item) }}" class="btn btn-info btn-sm" title="Invoice">
+                                    <i class="fas fa-file-invoice"></i> Invoice
+                                </a>
                             </td>
+                            
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-center">Tidak ada data penjualan</td>
+                            <td colspan="9" class="text-center">Tidak ada data penjualan</td>
                         </tr>
                     @endforelse
                     </tbody>
