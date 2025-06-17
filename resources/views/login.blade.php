@@ -57,17 +57,6 @@
 @stop
 
 @section('auth_footer')
-    <p class="my-0">
-        <a href="{{ route('password.request') }}">
-            I forgot my password
-        </a>
-    </p>
-
-    <p class="my-2">
-        <a href="{{ route('register') }}">
-            Register a new account
-        </a>
-    </p>
 @stop
 
 @section('styles')
@@ -83,4 +72,3 @@
     }
 </style>
 @stop
-

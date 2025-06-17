@@ -16,12 +16,6 @@ Route::get('/', function () {
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
     Route::middleware('record.login')->post('/login', [AuthController::class, 'login']);
-    Route::get('/forgot-password', function () {
-        return view('auth.forgot-password');
-    })->name('password.request');
-    Route::get('/register', function () {
-        return view('auth.register');
-    })->name('register');
 });
 
 // Admin Routes
