@@ -28,8 +28,8 @@ class BarangKeluarController extends Controller
         $barang = Barang::where('stok', '>', 0)->get();
         // Auto generate kode transaksi
         $lastTransaksi = BarangKeluar::latest()->first();
-        $kodeTransaksi = 'BK-' . date('Ymd') . '-' . str_pad(($lastTransaksi ? substr($lastTransaksi->kode_transaksi, -4) + 1 : 1), 4, '0', STR_PAD_LEFT);
-
+        $nextId = $lastTransaksi ? (int)substr($lastTransaksi->kode_transaksi, -4) + 1 : 1;
+        $kodeTransaksi = 'BK-' . date('Ymd') . '-' . str_pad($nextId, 4, '0', STR_PAD_LEFT);
         return view('admin.barang-keluar.create', compact('barang', 'kodeTransaksi'));
     }
 
