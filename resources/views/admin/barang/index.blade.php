@@ -1,4 +1,9 @@
-@extends('layouts.admin')
+@php
+    $layout = auth()->user()->is_admin() ? 'admin' :
+             (auth()->user()->is_manager() ? 'manager' : 'staff');
+@endphp
+@extends('layouts.' . $layout)
+
 
 @section('title', 'Data Barang')
 

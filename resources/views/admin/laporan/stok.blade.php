@@ -1,4 +1,9 @@
-@extends('layouts.admin')
+@php
+    $layout = auth()->user()->is_admin() ? 'admin' :
+             (auth()->user()->is_manager() ? 'manager' : 'staff');
+@endphp
+@extends('layouts.' . $layout)
+
 
 @section('title', 'Laporan Stok Barang')
 
@@ -54,12 +59,12 @@
             <div class="d-flex justify-content-between align-items-center">
                 <h3 class="card-title">Data Stok Barang</h3>
                 <div>
-                    <a href="{{ route('admin.laporan.stok', array_merge(request()->all(), ['export' => 'pdf'])) }}" class="btn btn-danger">
-                        <i class="fas fa-file-pdf mr-1"></i> Export PDF
-                    </a>
-                    <a href="{{ route('admin.laporan.stok', array_merge(request()->all(), ['export' => 'excel'])) }}" class="btn btn-success">
-                        <i class="fas fa-file-excel mr-1"></i> Export Excel
-                    </a>
+{{--                    <a href="{{ route('admin.laporan.stok', array_merge(request()->all(), ['export' => 'pdf'])) }}" class="btn btn-danger">--}}
+{{--                        <i class="fas fa-file-pdf mr-1"></i> Export PDF--}}
+{{--                    </a>--}}
+{{--                    <a href="{{ route('admin.laporan.stok', array_merge(request()->all(), ['export' => 'excel'])) }}" class="btn btn-success">--}}
+{{--                        <i class="fas fa-file-excel mr-1"></i> Export Excel--}}
+{{--                    </a>--}}
                 </div>
             </div>
         </div>

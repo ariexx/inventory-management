@@ -55,4 +55,34 @@ class User extends Authenticatable
     {
         return $this->hasMany(LoginActivity::class);
     }
+
+    /**
+     * Get the user level.
+     *
+     * @return string
+     */
+    public function getLevelAttribute(): string
+    {
+        return match ($this->attributes['level']) {
+            'admin' => 'admin',
+            'manager' => 'manager',
+            'staff' => 'staff',
+            default => 'Unknown',
+        };
+    }
+
+    public function is_admin(): bool
+    {
+        return $this->level === 'admin';
+    }
+
+    public function is_manager(): bool
+    {
+        return $this->level === 'manager';
+    }
+
+    public function is_staff(): bool
+    {
+        return $this->level === 'staff';
+    }
 }

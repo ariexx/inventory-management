@@ -7,6 +7,7 @@ use App\Http\Controllers\BarangKeluarController;
 use App\Http\Controllers\BarangMasukController;
 use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\PesananBarangController;
+use App\Http\Controllers\RestockRequestController;
 use Illuminate\Support\Facades\Route;
 
 // Authentication Routes
@@ -68,10 +69,15 @@ Route::middleware(['auth', 'level:admin'])->prefix('admin')->name('admin.')->gro
     // Login Activity routes (admin only)
     Route::get('/admin/login-activities', [App\Http\Controllers\LoginActivityController::class, 'index'])
         ->name('admin.login-activities.index');
+
+    // Restock Request Management
+    Route::get('restock-requests', [RestockRequestController::class, 'adminIndex'])->name('restock-requests.index');
+    Route::get('restock-requests/{restockRequest}', [RestockRequestController::class, 'adminShow'])->name('restock-requests.show');
+    Route::post('restock-requests/{restockRequest}/process', [RestockRequestController::class, 'adminProcess'])->name('restock-requests.process');
 });
 
 // Staff Routes (has limited access)
-Route::middleware(['auth', 'level:staff,admin'])->prefix('staff')->name('staff.')->group(function () {
+Route::middleware(['auth', 'level:staff'])->prefix('staff')->name('staff.')->group(function () {
     Route::get('/dashboard', [AdminController::class, 'staffDashboard'])->name('dashboard');
 
     // Limited access to data
@@ -82,10 +88,15 @@ Route::middleware(['auth', 'level:staff,admin'])->prefix('staff')->name('staff.'
     // Stock Correction
     Route::get('/stok-koreksi', [App\Http\Controllers\StokKoreksiController::class, 'index'])->name('stok-koreksi.index');
     Route::post('/stok-koreksi', [App\Http\Controllers\StokKoreksiController::class, 'store'])->name('stok-koreksi.store');
+
+    // Restock Requests
+    Route::get('restock-requests', [RestockRequestController::class, 'staffIndex'])->name('restock-requests.index');
+    Route::get('restock-requests/create', [RestockRequestController::class, 'staffCreate'])->name('restock-requests.create');
+    Route::post('restock-requests', [RestockRequestController::class, 'staffStore'])->name('restock-requests.store');
 });
 
 // Manager Routes (can see everything, edit some things)
-Route::middleware(['auth', 'level:manager,admin'])->prefix('manager')->name('manager.')->group(function () {
+Route::middleware(['auth', 'level:manager'])->prefix('manager')->name('manager.')->group(function () {
     //    Route::get('/dashboard', [AdminController::class, 'managerDashboard'])->name('dashboard');
     Route::get('/dashboard', [App\Http\Controllers\ManagerDashboardController::class, 'index'])->name('dashboard');
 
@@ -94,12 +105,24 @@ Route::middleware(['auth', 'level:manager,admin'])->prefix('manager')->name('man
     Route::resource('barang-masuk', BarangMasukController::class);
     Route::resource('barang-keluar', BarangKeluarController::class);
 
+
+    // Pesanan Barang (Product Orders)
+    Route::resource('pesanan-barang', PesananBarangController::class);
+    Route::get('pesanan-barang/{pesananBarang}/receive', [PesananBarangController::class, 'receive'])->name('pesanan-barang.receive');
+    Route::post('pesanan-barang/{pesananBarang}/receive', [PesananBarangController::class, 'processReceive'])->name('pesanan-barang.process-receive');
+
+
     // Manager Reports
     Route::prefix('laporan')->name('laporan.')->group(function () {
         Route::get('/stok', [LaporanController::class, 'stok'])->name('stok');
         Route::get('/barang-masuk', [LaporanController::class, 'barangMasuk'])->name('barang-masuk');
         Route::get('/barang-keluar', [LaporanController::class, 'barangKeluar'])->name('barang-keluar');
     });
+
+    // Restock Request Management
+    Route::get('restock-requests', [RestockRequestController::class, 'managerIndex'])->name('restock-requests.index');
+    Route::get('restock-requests/{restockRequest}', [RestockRequestController::class, 'managerShow'])->name('restock-requests.show');
+    Route::post('restock-requests/{restockRequest}/process', [RestockRequestController::class, 'managerProcess'])->name('restock-requests.process');
 });
 
 // Default dashboard redirect based on user level
@@ -107,14 +130,22 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', function () {
         $user = auth()->user();
 
-        return match ($user->level) {
-            'admin' => redirect()->route('admin.dashboard'),
-            'manager' => redirect()->route('manager.dashboard'),
-            'staff' => redirect()->route('staff.dashboard'),
-            default => redirect()->route('admin.dashboard'),
-        };
+
+        if ($user->level === 'manager' && !request()->routeIs('manager.dashboard')) {
+            return redirect()->route('manager.dashboard');
+        }
+        if ($user->level === 'staff' && !request()->routeIs('staff.dashboard')) {
+            return redirect()->route('staff.dashboard');
+        }
+        if ($user->level === 'admin' && !request()->routeIs('admin.dashboard')) {
+            return redirect()->route('admin.dashboard');
+        }
+
+        // Prevent redirect loop: show a default view or message if already on the correct dashboard
+        abort(403, 'Unauthorized access.');
     })->name('dashboard');
 
+    // Logout route
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 });
 

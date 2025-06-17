@@ -91,6 +91,13 @@
                     </li>
 
                     <li class="nav-item">
+                        <a href="{{ route('admin.pesanan-barang.index') }}" class="nav-link {{ request()->routeIs('admin.pesanan-barang.*') ? 'active' : '' }}">
+                            <i class="nav-icon fas fa-shopping-bag"></i>
+                            <p>Pembelian Supplier</p>
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
                         <a href="{{ route('admin.barang.index') }}" class="nav-link {{ request()->routeIs('admin.barang.*') ? 'active' : '' }}">
                             <i class="nav-icon fas fa-boxes"></i>
                             <p>Data Barang</p>

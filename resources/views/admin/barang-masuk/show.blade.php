@@ -16,6 +16,9 @@
                         <a href="{{ route('admin.barang-masuk.edit', $barangMasuk->id) }}" class="btn btn-warning btn-sm">
                             <i class="fas fa-edit mr-1"></i> Edit
                         </a>
+                        <a href="javascript:window.print()" class="btn btn-primary btn-sm">
+                            <i class="fas fa-print mr-1"></i> Print
+                        </a>
                         <a href="{{ route('admin.barang-masuk.index') }}" class="btn btn-secondary btn-sm">
                             <i class="fas fa-arrow-left mr-1"></i> Kembali
                         </a>

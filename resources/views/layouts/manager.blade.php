@@ -36,6 +36,35 @@
 
         <!-- Right navbar links -->
         <ul class="navbar-nav ml-auto">
+            <!-- Notifications Dropdown Menu -->
+            <li class="nav-item dropdown">
+                @php
+                    $pendingOrdersCount = \App\Models\PesananBarang::where('status', 'pending')->count();
+                    $restockRequestsCount = \App\Models\RestockRequest::where('status', 'pending')->count();
+                    $totalNotifications = $pendingOrdersCount + $restockRequestsCount;
+                @endphp
+                <a class="nav-link" data-toggle="dropdown" href="#">
+                    <i class="far fa-bell"></i>
+                    @if($totalNotifications > 0)
+                        <span class="badge badge-danger navbar-badge">{{ $totalNotifications }}</span>
+                    @endif
+                </a>
+                <div class="dropdown-menu dropdown-menu-lg dropdown-menu-right">
+                    <span class="dropdown-item dropdown-header">{{ $totalNotifications }} Notifikasi</span>
+                    <div class="dropdown-divider"></div>
+                    @if($pendingOrdersCount > 0)
+                        <a href="{{ route('manager.pesanan-barang.index') }}" class="dropdown-item">
+                            <i class="fas fa-shopping-bag mr-2"></i> {{ $pendingOrdersCount }} pesanan menunggu persetujuan
+                        </a>
+                    @endif
+                    @if($restockRequestsCount > 0)
+                        <a href="{{ route('manager.restock-requests.index') }}" class="dropdown-item">
+                            <i class="fas fa-exclamation-circle mr-2"></i> {{ $restockRequestsCount }} permintaan restock
+                        </a>
+                    @endif
+                </div>
+            </li>
+
             <li class="nav-item dropdown">
                 <a class="nav-link" data-toggle="dropdown" href="#">
                     <i class="far fa-user"></i> {{ Auth::user()->name }}
@@ -82,6 +111,30 @@
                             <p>Dashboard</p>
                         </a>
                     </li>
+
+                    <li class="nav-item">
+                        <a href="{{ route('manager.pesanan-barang.index') }}" class="nav-link {{ request()->routeIs('manager.pesanan-barang.*') ? 'active' : '' }}">
+                            <i class="nav-icon fas fa-shopping-bag"></i>
+                            <p>
+                                Pesanan Suppplier
+                                @if($pendingOrdersCount > 0)
+                                    <span class="badge badge-danger right">{{ $pendingOrdersCount }}</span>
+                                @endif
+                            </p>
+                        </a>
+                    </li>
+
+{{--                    <li class="nav-item">--}}
+{{--                        <a href="{{ route('manager.restock-requests.index') }}" class="nav-link {{ request()->routeIs('manager.restock-requests.*') ? 'active' : '' }}">--}}
+{{--                            <i class="nav-icon fas fa-clipboard-check"></i>--}}
+{{--                            <p>--}}
+{{--                                Permintaan Restock--}}
+{{--                                @if($restockRequestsCount > 0)--}}
+{{--                                    <span class="badge badge-danger right">{{ $restockRequestsCount }}</span>--}}
+{{--                                @endif--}}
+{{--                            </p>--}}
+{{--                        </a>--}}
+{{--                    </li>--}}
 
                     <li class="nav-item">
                         <a href="{{ route('manager.barang.index') }}" class="nav-link {{ request()->routeIs('manager.barang.*') ? 'active' : '' }}">

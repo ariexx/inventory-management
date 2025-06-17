@@ -109,6 +109,15 @@
                             <p>Koreksi Stok</p>
                         </a>
                     </li>
+
+                    <li class="nav-item">
+                        <a href="{{ route('staff.restock-requests.index') }}" class="nav-link {{ request()->routeIs('manager.restock-requests.*') ? 'active' : '' }}">
+                            <i class="nav-icon fas fa-clipboard-check"></i>
+                            <p>
+                                Permintaan Restock
+                            </p>
+                        </a>
+                    </li>
                 </ul>
             </nav>
             <!-- /.sidebar-menu -->
