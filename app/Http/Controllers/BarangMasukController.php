@@ -30,8 +30,8 @@ class BarangMasukController extends Controller
         $supplier = Supplier::all();
         // Auto generate kode transaksi
         $lastTransaksi = BarangMasuk::latest()->first();
-        $kodeTransaksi = 'BM-' . date('Ymd') . '-' . str_pad(($lastTransaksi ? substr($lastTransaksi->kode_transaksi, -4) + 1 : 1), 4, '0', STR_PAD_LEFT);
-
+        $nextId = $lastTransaksi ? (int)substr($lastTransaksi->kode_transaksi, -4) + 1 : 1;
+        $kodeTransaksi = 'BM-' . date('Ymd') . '-' . str_pad($nextId, 4, '0', STR_PAD_LEFT);
         return view('admin.barang-masuk.create', compact('barang', 'supplier', 'kodeTransaksi'));
     }
 
