@@ -16,6 +16,7 @@ class BarangMasuk extends Model
         'kode_transaksi',
         'barang_id',
         'supplier_id',
+        'pesanan_id', // New field to link to PesananBarang
         'jumlah',
         'tanggal',
         'keterangan',
@@ -33,5 +34,11 @@ class BarangMasuk extends Model
     public function supplier(): BelongsTo
     {
         return $this->belongsTo(Supplier::class, 'supplier_id');
+    }
+
+    // Relationship to PesananBarang
+    public function pesanan(): BelongsTo
+    {
+        return $this->belongsTo(PesananBarang::class, 'pesanan_id');
     }
 }

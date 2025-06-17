@@ -6,6 +6,7 @@ use App\Http\Controllers\BarangController;
 use App\Http\Controllers\BarangKeluarController;
 use App\Http\Controllers\BarangMasukController;
 use App\Http\Controllers\LaporanController;
+use App\Http\Controllers\PesananBarangController;
 use Illuminate\Support\Facades\Route;
 
 // Authentication Routes
@@ -36,6 +37,11 @@ Route::middleware(['auth', 'level:admin'])->prefix('admin')->name('admin.')->gro
 
     // Data Barang
     Route::resource('barang', BarangController::class);
+
+    // Pesanan Barang (Product Orders)
+    Route::resource('pesanan-barang', PesananBarangController::class);
+    Route::get('pesanan-barang/{pesananBarang}/receive', [PesananBarangController::class, 'receive'])->name('pesanan-barang.receive');
+    Route::post('pesanan-barang/{pesananBarang}/receive', [PesananBarangController::class, 'processReceive'])->name('pesanan-barang.process-receive');
 
     // Barang Masuk
     Route::resource('barang-masuk', BarangMasukController::class);
