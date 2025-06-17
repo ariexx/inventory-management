@@ -70,6 +70,8 @@
                     </div>
                 </div>
 
+                <input type="hidden" id="harga_satuan_hidden" name="harga_satuan_hidden" value="0">
+
                 <div class="form-group">
                     <label for="nama_pembeli">Nama Pembeli</label>
                     <input type="text" class="form-control @error('nama_pembeli') is-invalid @enderror" id="nama_pembeli" name="nama_pembeli" value="{{ old('nama_pembeli') }}">
@@ -144,22 +146,12 @@
                 var harga = parseInt(selectedOption.data('harga')) || 0;
                 var stok = parseInt(selectedOption.data('stok')) || 0;
 
-                console.log('Jumlah:', jumlah, 'Harga:', harga, 'Stok:', stok);
-
+                // Update display fields
                 $('#harga_satuan').val('Rp ' + formatRupiah(harga));
                 $('#total_harga').val('Rp ' + formatRupiah(harga * jumlah));
 
-                // Add hidden field for controller
-                if ($('#harga_satuan_hidden').length === 0) {
-                    $('<input>').attr({
-                        type: 'hidden',
-                        id: 'harga_satuan_hidden',
-                        name: 'harga_satuan_hidden',
-                        value: harga
-                    }).appendTo('form');
-                } else {
-                    $('#harga_satuan_hidden').val(harga);
-                }
+                // Update hidden field with raw value (no formatting)
+                $('#harga_satuan_hidden').val(harga);
 
                 $('#stok-tersedia').text(stok);
                 var sisaStok = stok - jumlah;
