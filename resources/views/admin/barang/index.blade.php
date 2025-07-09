@@ -70,21 +70,23 @@
                             <td>{{ $item->minimal_stok }}</td>
                             <td>{{ $item->satuan }}</td>
                             <td>
-                                <div class="btn-group">
-                                    <a href="{{ route('admin.barang.show', $item->id) }}" class="btn btn-info btn-sm" title="Detail">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                    <a href="{{ route('admin.barang.edit', $item->id) }}" class="btn btn-warning btn-sm" title="Edit">
-                                        <i class="fas fa-edit"></i>
-                                    </a>
-                                    <form action="{{ route('admin.barang.destroy', $item->id) }}" method="POST" onsubmit="return confirmDelete()">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-danger btn-sm" title="Hapus">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </form>
-                                </div>
+                                @if(auth()->user()->is_admin())
+                                    <div class="btn-group">
+                                        <a href="{{ route('admin.barang.show', $item->id) }}" class="btn btn-info btn-sm" title="Detail">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{{ route('admin.barang.edit', $item->id) }}" class="btn btn-warning btn-sm" title="Edit">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <form action="{{ route('admin.barang.destroy', $item->id) }}" method="POST" onsubmit="return confirmDelete()">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-danger btn-sm" title="Hapus">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                @endif
                             </td>
                         </tr>
                     @empty
