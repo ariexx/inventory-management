@@ -16,9 +16,11 @@
         <div class="card-header">
             <div class="d-flex justify-content-between align-items-center">
                 <h3 class="card-title">Daftar Barang Keluar</h3>
-                <a href="{{ route('admin.barang-keluar.create') }}" class="btn btn-primary">
-                    <i class="fas fa-plus-circle mr-1"></i> Tambah Barang Keluar
-                </a>
+                @if(auth()->user()->is_admin())
+                    <a href="{{ route('admin.barang-keluar.create') }}" class="btn btn-primary">
+                        <i class="fas fa-plus-circle mr-1"></i> Tambah Barang Keluar
+                    </a>
+                @endif
             </div>
         </div>
         <div class="card-body">
