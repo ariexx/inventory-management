@@ -17,7 +17,7 @@
             <h3 class="card-title">Filter Laporan</h3>
         </div>
         <div class="card-body">
-            <form action="{{ route('admin.laporan.barang-masuk') }}" method="GET">
+            <form action="{{ route(auth()->user()->level.'.laporan.barang-masuk') }}" method="GET">
                 <div class="row">
                     <div class="col-md-3">
                         <div class="form-group">
