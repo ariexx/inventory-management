@@ -133,12 +133,12 @@
                     </li>
 
 
-                    <li class="nav-item">
-                        <a href="{{ route('admin.admin.login-activities.index') }}" class="nav-link {{ request()->routeIs('admin.admin.login-activities.*') ? 'active' : '' }}">
-                            <i class="nav-icon fas fa-clock"></i>
-                            <p>Aktifitas</p>
-                        </a>
-                    </li>
+{{--                    <li class="nav-item">--}}
+{{--                        <a href="{{ route('admin.admin.login-activities.index') }}" class="nav-link {{ request()->routeIs('admin.admin.login-activities.*') ? 'active' : '' }}">--}}
+{{--                            <i class="nav-icon fas fa-clock"></i>--}}
+{{--                            <p>Aktifitas</p>--}}
+{{--                        </a>--}}
+{{--                    </li>--}}
 
 
                     <li class="nav-header">LAPORAN</li>
