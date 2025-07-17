@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Barang;
+use App\Models\BarangKeluar;
 use App\Models\Penjualan;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -71,6 +72,18 @@ class PenjualanController extends Controller
             'nama_pembeli' => $request->nama_pembeli ?? null,
             'keterangan' => $request->keterangan ?? null,
         ]);
+
+        // store barang keluar
+        $barangKeluar = new BarangKeluar();
+        $barangKeluar->kode_transaksi = $kodeTrx;
+        $barangKeluar->barang_id = $request->barang_id;
+        $barangKeluar->jumlah = $request->jumlah;
+        $barangKeluar->tanggal = $request->tanggal;
+        $barangKeluar->tujuan = $request->nama_pembeli ?? 'Penjualan';
+        $barangKeluar->penerima = $request->nama_pembeli ?? 'Pembeli';
+        $barangKeluar->keterangan = $request->keterangan ?? 'Penjualan';
+        $barangKeluar->harga_jual = $hargaSatuan;
+        $barangKeluar->save();
 
         // Update stock
         $barang->stok -= $request->jumlah;
