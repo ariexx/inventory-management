@@ -55,6 +55,8 @@ Route::middleware(['auth', 'level:admin'])->prefix('admin')->name('admin.')->gro
         Route::get('/stok', [LaporanController::class, 'stok'])->name('stok');
         Route::get('/barang-masuk', [LaporanController::class, 'barangMasuk'])->name('barang-masuk');
         Route::get('/barang-keluar', [LaporanController::class, 'barangKeluar'])->name('barang-keluar');
+        Route::get('/barang-masuk/{id}/invoice', [LaporanController::class, 'barangMasukInvoice'])->name('barang-masuk.invoice');
+        Route::get('/barang-keluar/{id}/invoice', [LaporanController::class, 'barangKeluarInvoice'])->name('barang-keluar.invoice');
     });
 
     // Kategori Barang
@@ -117,6 +119,8 @@ Route::middleware(['auth', 'level:manager'])->prefix('manager')->name('manager.'
         Route::get('/stok', [LaporanController::class, 'stok'])->name('stok');
         Route::get('/barang-masuk', [LaporanController::class, 'barangMasuk'])->name('barang-masuk');
         Route::get('/barang-keluar', [LaporanController::class, 'barangKeluar'])->name('barang-keluar');
+        Route::get('/barang-masuk/{id}/invoice', [LaporanController::class, 'barangMasukInvoice'])->name('barang-masuk.invoice');
+        Route::get('/barang-keluar/{id}/invoice', [LaporanController::class, 'barangKeluarInvoice'])->name('barang-keluar.invoice');
     });
 
     // Restock Request Management

@@ -100,6 +100,7 @@
                         <th width="10%">Jumlah</th>
                         <th width="20%">Supplier</th>
                         <th width="15%">Keterangan</th>
+                        <th width="10%">Aksi</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -112,6 +113,11 @@
                             <td>{{ $item->jumlah }}</td>
                             <td>{{ $item->supplier->nama ?? 'N/A' }}</td>
                             <td>{{ $item->keterangan ?? '-' }}</td>
+                            <td>
+                                <a href="{{ route(auth()->user()->level.'.laporan.barang-masuk.invoice', $item->id) }}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-file-invoice"></i> Invoice
+                                </a>
+                            </td>
                         </tr>
                     @empty
                         <tr>

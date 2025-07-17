@@ -100,4 +100,40 @@ class LaporanController extends Controller
 
         return view('admin.laporan.barang-keluar', compact('barangKeluar', 'barang'));
     }
+
+    /**
+     * Display invoice for barang masuk.
+     */
+    public function barangMasukInvoice($id)
+    {
+        $barangMasuk = BarangMasuk::with(['barang', 'supplier'])->findOrFail($id);
+
+        // Get company info (you might want to store this in config or settings table)
+        $companyInfo = [
+            'name' => config('app.name', 'Inventory Management'),
+            'address' => config('app.address', 'Jl. Contoh Alamat No. 123, Jakarta'),
+            'phone' => config('app.phone', '021-12345678'),
+            'email' => config('app.email', 'example@inventory.com'),
+        ];
+
+        return view('admin.laporan.barang-masuk-invoice', compact('barangMasuk', 'companyInfo'));
+    }
+
+    /**
+     * Display invoice for barang keluar.
+     */
+    public function barangKeluarInvoice($id)
+    {
+        $barangKeluar = BarangKeluar::with('barang')->findOrFail($id);
+
+        // Get company info (you might want to store this in config or settings table)
+        $companyInfo = [
+            'name' => config('app.name', 'Inventory Management'),
+            'address' => config('app.address', 'Jl. Contoh Alamat No. 123, Jakarta'),
+            'phone' => config('app.phone', '021-12345678'),
+            'email' => config('app.email', 'example@inventory.com'),
+        ];
+
+        return view('admin.laporan.barang-keluar-invoice', compact('barangKeluar', 'companyInfo'));
+    }
 }
