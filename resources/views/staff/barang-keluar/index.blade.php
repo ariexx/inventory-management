@@ -32,9 +32,8 @@
                         <th width="10%">Jumlah</th>
                         <th width="15%">Tujuan</th>
                         <th width="15%">Tanggal</th>
-                        @if(auth()->user()->is_admin())
-                            <th width="15%">Aksi</th>
-                        @endif
+                        <th width="15%">Aksi</th>
+
                     </tr>
                     </thead>
                     <tbody>
