@@ -57,7 +57,9 @@
                         <th>Harga Jual</th>
                         <th>Minimal Stok</th>
                         <th>Satuan</th>
-                        <th width="15%">Aksi</th>
+                        @if(auth()->user()->is_admin())
+                            <th width="15%">Aksi</th>
+                        @endif
                     </tr>
                     </thead>
                     <tbody>
