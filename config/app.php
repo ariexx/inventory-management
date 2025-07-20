@@ -123,4 +123,8 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    'address' => env('APP_ADDRESS', 'Jl. Contoh Alamat No. 123, Jakarta'),
+    'phone' => env('APP_PHONE', '+62 123 4567 890'),
+    'email' => env('APP_EMAIL', 'example@gmail.com'),
+
 ];
