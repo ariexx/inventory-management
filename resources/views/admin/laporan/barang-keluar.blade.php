@@ -94,8 +94,9 @@
                         <th width="15%">Tujuan</th>
                         <th width="10%">Penerima</th>
                         <th width="10%">Keterangan</th>
-                        <th width="10%">Aksi</th>
-
+                        @if(auth()->user()->is_admin())
+                            <th width="10%">Aksi</th>
+                        @endif
                     </tr>
                     </thead>
                     <tbody>
@@ -109,11 +110,13 @@
                             <td>{{ $item->tujuan ?? '-' }}</td>
                             <td>{{ $item->penerima ?? '-' }}</td>
                             <td>{{ $item->keterangan ?? '-' }}</td>
-                            <td>
-                                <a href="{{ route(auth()->user()->level.'.laporan.barang-keluar.invoice', $item->id) }}" class="btn btn-primary btn-sm">
-                                    <i class="fas fa-file-invoice"></i> Invoice
-                                </a>
-                            </td>
+                            @if(auth()->user()->is_admin())
+                                <td>
+                                    <a href="{{ route(auth()->user()->level.'.laporan.barang-keluar.invoice', $item->id) }}" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-file-invoice"></i> Invoice
+                                    </a>
+                                </td>
+                            @endif
                         </tr>
                     @empty
                         <tr>
