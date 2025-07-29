@@ -96,7 +96,6 @@ jobs:
             sed -i 's|APP_DEBUG=.*|APP_DEBUG=false|' .env
             sed -i 's|APP_ENV=.*|APP_ENV=production|' .env
             sed -i 's|DB_HOST=.*|DB_HOST=mysql|' .env
-            sed -i 's|DB_HOST=.*|DB_HOST=127.0.0.1|' .env
             sed -i 's|DB_PORT=.*|DB_PORT=3306|' .env
             sed -i 's|DB_DATABASE=.*|DB_DATABASE=inventory_db|' .env
             sed -i 's|DB_USERNAME=.*|DB_USERNAME=inventory_user|' .env
