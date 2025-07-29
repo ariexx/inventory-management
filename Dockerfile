@@ -14,21 +14,21 @@ WORKDIR /var/www
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --optimize-autoloader --no-scripts
 
-# Copy package.json and install npm dependencies INCLUDING dev dependencies
+# Copy package.json and install npm
 COPY package*.json ./
-RUN npm ci  # Remove --production flag untuk build
+RUN npm ci
 
-# Copy all files
+# Copy all files EXCEPT .env (akan di-generate di deploy)
 COPY . /var/www
 
-# Build assets (vite akan tersedia karena dev dependencies di-install)
+# Build assets
 RUN npm run build
 
-# Clean up node_modules after build untuk menghemat space
+# Clean up node_modules
 RUN rm -rf node_modules
 
-# Generate Laravel key
-RUN php artisan key:generate --no-interaction
+# JANGAN generate key di sini - biarkan deploy script yang handle
+# RUN php artisan key:generate --no-interaction
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www \
@@ -39,7 +39,7 @@ RUN chown -R www-data:www-data /var/www \
 RUN echo '[www]' > /usr/local/etc/php-fpm.d/zz-docker.conf \
     && echo 'user = www-data' >> /usr/local/etc/php-fpm.d/zz-docker.conf \
     && echo 'group = www-data' >> /usr/local/etc/php-fpm.d/zz-docker.conf \
-    && echo 'listen = 0.0.0.0:9000' >> /usr/local/etc/php-fpm.d/zz-docker.conf
+    && echo 'listen = 0.0.0.0:9000' >> /usr/local/etc/php-fpm.conf
 
 EXPOSE 9000
 CMD ["php-fpm"]

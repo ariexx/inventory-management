@@ -109,13 +109,20 @@ jobs:
             # Wait for containers to be ready
             sleep 60
 
+            echo "=== Generating Laravel Key ==="
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan key:generate --force || echo "Key generation failed"
+
             # Debug: Check container status
             echo "=== Container Status ==="
             docker ps -a
 
             # Debug: Check PHP-FPM logs
             echo "=== PHP-FPM Logs ==="
-            docker logs inventory_app
+            docker logs inventory_app --tail 50
+
+            echo "=== Container Health Check ==="
+            docker-compose -f docker-compose.prod.yml exec -T app php --version || echo "PHP not working"
+            docker-compose -f docker-compose.prod.yml exec -T app ls -la /var/www/.env || echo ".env not found"
 
             # Debug: Test PHP-FPM port
             echo "=== Testing PHP-FPM Connection ==="
