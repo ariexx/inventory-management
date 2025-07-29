@@ -107,8 +107,8 @@ jobs:
             sed -i 's|DB_HOST=.*|DB_HOST=mysql|' .env
             sed -i 's|DB_PORT=.*|DB_PORT=3306|' .env
             sed -i 's|DB_DATABASE=.*|DB_DATABASE=inventory_db|' .env
-            sed -i 's|DB_USERNAME=.*|DB_USERNAME=inventory_user|' .env
-            sed -i 's|DB_PASSWORD=.*|DB_PASSWORD=${{ secrets.DB_PASSWORD }}|' .env
+            sed -i 's|DB_USERNAME=.*|DB_USERNAME=root|' .env
+            sed -i 's|DB_PASSWORD=.*|DB_PASSWORD=root_password_123|' .env
             sed -i 's|SESSION_SECURE_COOKIE=.*|SESSION_SECURE_COOKIE=true|' .env
 
             APP_KEY=$(docker run --rm php:8.2-cli php -r "echo 'base64:'.base64_encode(random_bytes(32));")
