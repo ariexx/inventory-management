@@ -66,34 +66,54 @@ jobs:
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASSWORD }}
           script: |
-            git config --global --add safe.directory /var/www/inventory-management.shop
+            # Use home directory instead of /var/www
+            PROJECT_DIR="$HOME/inventory-management.shop"
 
-            cd /var/www/inventory-management.shop
-            git pull origin main
+            git config --global --add safe.directory $PROJECT_DIR
+
+            # Clone or pull project
+            if [ ! -d "$PROJECT_DIR" ]; then
+              git clone https://github.com/ariefly/inventory-management.shop.git $PROJECT_DIR
+            else
+              cd $PROJECT_DIR
+              git pull origin main
+            fi
+
+            cd $PROJECT_DIR
 
             # Create required directories
-            mkdir -p docker/php docker/nginx ssl
+            mkdir -p docker/php docker/nginx
 
-            # Generate SSL certificate with Let's Encrypt
+            # Stop containers first for SSL generation
+            docker-compose -f docker-compose.prod.yml down || true
+
+            # Generate SSL certificate if not exists
             if [ ! -f "/etc/letsencrypt/live/inventory-management.shop/fullchain.pem" ]; then
               sudo apt update
               sudo apt install -y certbot
-              sudo certbot certonly --standalone -d inventory-management.shop -d www.inventory-management.shop --non-interactive --agree-tos --email your-email@example.com
+              sudo certbot certonly --standalone -d inventory-management.shop -d www.inventory-management.shop --non-interactive --agree-tos --email ariefly@example.com
             fi
 
-            # Copy .env file
-            cp .env.example .env.production
+            # Copy and configure .env file
+            cp .env.example .env
+            sed -i 's|APP_URL=.*|APP_URL=https://inventory-management.shop|' .env
+            sed -i 's|DB_HOST=.*|DB_HOST=mysql|' .env
+            sed -i 's|DB_DATABASE=.*|DB_DATABASE=inventory_db|' .env
+            sed -i 's|DB_USERNAME=.*|DB_USERNAME=inventory_user|' .env
+            sed -i 's|DB_PASSWORD=.*|DB_PASSWORD=secure_password_123|' .env
 
-            # Set APP_URL to HTTPS
-            sed -i 's|APP_URL=.*|APP_URL=https://inventory-management.shop|' .env.production
+            # Generate app key if not exists
+            php artisan key:generate
 
-            docker-compose -f docker-compose.prod.yml down
+            # Start containers
             docker-compose -f docker-compose.prod.yml up -d --build
 
-            sleep 10
+            # Wait for containers to be ready
+            sleep 20
 
+            # Run Laravel commands
             docker-compose -f docker-compose.prod.yml exec -T app composer install --no-dev --optimize-autoloader
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan migrate --force --env=production
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan config:cache --env=production
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan route:cache --env=production
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan view:cache --env=production
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan migrate --force
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan config:cache
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan route:cache
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan view:cache
