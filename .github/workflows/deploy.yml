@@ -73,7 +73,7 @@ jobs:
 
             # Clone or pull project
             if [ ! -d "$PROJECT_DIR" ]; then
-              git clone https://github.com/ariefly/inventory-management.shop.git $PROJECT_DIR
+              git clone https://github.com/ariexx/inventory-management.git $PROJECT_DIR
             else
               cd $PROJECT_DIR
               git pull origin main
@@ -95,20 +95,13 @@ jobs:
             sed -i 's|APP_URL=.*|APP_URL=https://inventory-management.shop|' .env
             sed -i 's|APP_DEBUG=.*|APP_DEBUG=false|' .env
             sed -i 's|APP_ENV=.*|APP_ENV=production|' .env
+            sed -i 's|DB_HOST=.*|DB_HOST=mysql|' .env
             sed -i 's|DB_HOST=.*|DB_HOST=127.0.0.1|' .env
-            sed -i 's|DB_PORT=.*|DB_PORT=3308|' .env
+            sed -i 's|DB_PORT=.*|DB_PORT=3306|' .env
             sed -i 's|DB_DATABASE=.*|DB_DATABASE=inventory_db|' .env
             sed -i 's|DB_USERNAME=.*|DB_USERNAME=inventory_user|' .env
             sed -i 's|DB_PASSWORD=.*|DB_PASSWORD=your_secure_password|' .env
             sed -i 's|SESSION_SECURE_COOKIE=.*|SESSION_SECURE_COOKIE=true|' .env
-
-            # Install dependencies on host
-            composer install --no-dev --optimize-autoloader
-            npm ci --production
-            npm run build
-
-            # Generate app key
-            php artisan key:generate
 
             # Start containers
             docker-compose -f docker-compose.prod.yml up -d --build
@@ -157,6 +150,9 @@ jobs:
                 ssl_protocols TLSv1.2 TLSv1.3;
                 ssl_prefer_server_ciphers on;
                 ssl_session_cache shared:SSL:10m;
+
+                access_log /var/log/nginx/inventory_access.log;
+                error_log /var/log/nginx/inventory_error.log debug;
 
                 root $PROJECT_DIR/public;
                 index index.php index.html index.htm;
@@ -229,6 +225,16 @@ jobs:
               echo "Nginx configuration test failed"
               exit 1
             fi
+
+            echo "=== Final Debug ==="
+            echo "Checking if public/index.php exists:"
+            ls -la $PROJECT_DIR/public/index.php || echo "index.php NOT FOUND!"
+
+            echo "Testing Laravel via container:"
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan --version || echo "Laravel not working"
+
+            echo "Nginx error logs:"
+            sudo tail -20 /var/log/nginx/inventory_error.log || echo "No nginx errors yet"
 
             # Set final permissions
             sudo chown -R www-data:www-data $PROJECT_DIR/storage $PROJECT_DIR/bootstrap/cache

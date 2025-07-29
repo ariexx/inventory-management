@@ -8,8 +8,6 @@ services:
     working_dir: /var/www
     ports:
       - "127.0.0.1:9000:9000"
-    volumes:
-      - ./:/var/www
     environment:
       - APP_ENV=production
     networks:
