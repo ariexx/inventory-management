@@ -59,6 +59,11 @@ jobs:
     if: github.ref == 'refs/heads/main'
 
     steps:
+      - name: Run Migrations
+        run: php artisan migrate --force
+      - name: Run Tests
+        run: php artisan test --force
+
       - name: Deploy to VPS
         uses: appleboy/ssh-action@master
         with:
