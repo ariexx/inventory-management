@@ -59,61 +59,143 @@ jobs:
     if: github.ref == 'refs/heads/main'
 
     steps:
-      - name: Deploy to server
-        uses: appleboy/ssh-action@v0.1.5
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          password: ${{ secrets.PASSWORD }}
-          script: |
-            # Use home directory instead of /var/www
-            PROJECT_DIR="$HOME/inventory-management.shop"
+      script: |
+        # Use home directory instead of /var/www
+        PROJECT_DIR="$HOME/inventory-management.shop"
 
-            git config --global --add safe.directory $PROJECT_DIR
+        git config --global --add safe.directory $PROJECT_DIR
 
-            # Clone or pull project
-            if [ ! -d "$PROJECT_DIR" ]; then
-              git clone https://github.com/ariefly/inventory-management.shop.git $PROJECT_DIR
-            else
-              cd $PROJECT_DIR
-              git pull origin main
-            fi
+        # Clone or pull project
+        if [ ! -d "$PROJECT_DIR" ]; then
+          git clone https://github.com/ariefly/inventory-management.shop.git $PROJECT_DIR
+        else
+          cd $PROJECT_DIR
+          git pull origin main
+        fi
 
-            cd $PROJECT_DIR
+        cd $PROJECT_DIR
 
-            # Create required directories
-            mkdir -p docker/php docker/nginx
+        # Create required directories and set permissions
+        mkdir -p storage/logs bootstrap/cache
+        chmod -R 755 storage bootstrap/cache
+        chown -R $USER:$USER $PROJECT_DIR
 
-            # Stop containers first for SSL generation
-            docker-compose -f docker-compose.prod.yml down || true
+        # Stop containers first
+        docker-compose -f docker-compose.prod.yml down || true
 
-            # Generate SSL certificate if not exists
-            if [ ! -f "/etc/letsencrypt/live/inventory-management.shop/fullchain.pem" ]; then
-              sudo apt update
-              sudo apt install -y certbot
-              sudo certbot certonly --standalone -d inventory-management.shop -d www.inventory-management.shop --non-interactive --agree-tos --email ariefly@example.com
-            fi
+        # Copy and configure .env file
+        cp .env.example .env
+        sed -i 's|APP_URL=.*|APP_URL=https://inventory-management.shop|' .env
+        sed -i 's|DB_HOST=.*|DB_HOST=127.0.0.1|' .env
+        sed -i 's|DB_PORT=.*|DB_PORT=3307|' .env
+        sed -i 's|DB_DATABASE=.*|DB_DATABASE=inventory_db|' .env
+        sed -i 's|DB_USERNAME=.*|DB_USERNAME=inventory_user|' .env
+        sed -i 's|DB_PASSWORD=.*|DB_PASSWORD=your_secure_password|' .env
 
-            # Copy and configure .env file
-            cp .env.example .env
-            sed -i 's|APP_URL=.*|APP_URL=https://inventory-management.shop|' .env
-            sed -i 's|DB_HOST=.*|DB_HOST=mysql|' .env
-            sed -i 's|DB_DATABASE=.*|DB_DATABASE=inventory_db|' .env
-            sed -i 's|DB_USERNAME=.*|DB_USERNAME=inventory_user|' .env
-            sed -i 's|DB_PASSWORD=.*|DB_PASSWORD=secure_password_123|' .env
+        # Install dependencies on host
+        composer install --no-dev --optimize-autoloader
+        npm ci
+        npm run build
 
-            # Generate app key if not exists
-            php artisan key:generate
+        # Generate app key
+        php artisan key:generate
 
-            # Start containers
-            docker-compose -f docker-compose.prod.yml up -d --build
+        # Start containers
+        docker-compose -f docker-compose.prod.yml up -d --build
 
-            # Wait for containers to be ready
-            sleep 20
+        # Wait for containers to be ready
+        sleep 30
 
-            # Run Laravel commands
-            docker-compose -f docker-compose.prod.yml exec -T app composer install --no-dev --optimize-autoloader
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan migrate --force
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan config:cache
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan route:cache
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan view:cache
+        # Run Laravel commands
+        docker-compose -f docker-compose.prod.yml exec -T app php artisan migrate --force
+        docker-compose -f docker-compose.prod.yml exec -T app php artisan config:cache
+        docker-compose -f docker-compose.prod.yml exec -T app php artisan route:cache
+        docker-compose -f docker-compose.prod.yml exec -T app php artisan view:cache
+
+        # Remove any existing broken nginx config
+        sudo rm -f /etc/nginx/sites-enabled/inventory-management.shop
+
+        # Configure nginx VPS dengan SSL
+        sudo tee /etc/nginx/sites-available/inventory-management.shop > /dev/null <<EOF
+        server {
+            listen 80;
+            server_name inventory-management.shop www.inventory-management.shop;
+            return 301 https://\$server_name\$request_uri;
+        }
+
+        server {
+            listen 443 ssl http2;
+            server_name inventory-management.shop www.inventory-management.shop;
+
+            ssl_certificate /etc/letsencrypt/live/inventory-management.shop/fullchain.pem;
+            ssl_certificate_key /etc/letsencrypt/live/inventory-management.shop/privkey.pem;
+
+            ssl_protocols TLSv1.2 TLSv1.3;
+            ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA384;
+            ssl_prefer_server_ciphers on;
+            ssl_session_cache shared:SSL:10m;
+
+            root $PROJECT_DIR/public;
+            index index.php index.html index.htm;
+
+            # Security headers
+            add_header X-Frame-Options "SAMEORIGIN" always;
+            add_header X-XSS-Protection "1; mode=block" always;
+            add_header X-Content-Type-Options "nosniff" always;
+            add_header Referrer-Policy "no-referrer-when-downgrade" always;
+            add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+
+            location / {
+                try_files \$uri \$uri/ /index.php?\$query_string;
+            }
+
+            location ~ \.php$ {
+                fastcgi_pass 127.0.0.1:9000;
+                fastcgi_index index.php;
+                fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+                fastcgi_param HTTPS on;
+                include fastcgi_params;
+            }
+
+            location ~ /\.ht {
+                deny all;
+            }
+
+            location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+                expires 1y;
+                add_header Cache-Control "public, immutable";
+                add_header X-Frame-Options "SAMEORIGIN" always;
+                add_header X-XSS-Protection "1; mode=block" always;
+                add_header X-Content-Type-Options "nosniff" always;
+            }
+
+            # Laravel specific
+            location /storage {
+                alias $PROJECT_DIR/storage/app/public;
+            }
+        }
+        EOF
+
+        # Enable site
+        sudo ln -sf /etc/nginx/sites-available/inventory-management.shop /etc/nginx/sites-enabled/
+
+        # Test nginx config
+        sudo nginx -t
+
+        # Start nginx if not running, otherwise reload
+        if ! sudo systemctl is-active --quiet nginx; then
+          echo "Starting nginx service..."
+          sudo systemctl start nginx
+        else
+          echo "Reloading nginx service..."
+          sudo systemctl reload nginx
+        fi
+
+        # Verify nginx is running
+        sudo systemctl status nginx --no-pager
+
+        # Update SSL certificate if needed (optional)
+        sudo certbot renew --dry-run
+
+        # Set final permissions
+        sudo chown -R www-data:www-data $PROJECT_DIR/storage $PROJECT_DIR/bootstrap/cache
