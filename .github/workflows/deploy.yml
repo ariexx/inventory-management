@@ -41,13 +41,6 @@ jobs:
             echo "Running database migrations..."
             php artisan migrate --force || { echo "Failed to run migrations"; exit 1; }
 
-            # Clear and rebuild cache
-            echo "Clearing and rebuilding cache..."
-            php artisan cache:clear
-            php artisan config:cache
-            php artisan route:cache
-            php artisan view:cache
-            php artisan optimize:clear
 
             # Optional: Clear opcache if using PHP-FPM
             echo "Restarting PHP-FPM to clear opcache..."
