@@ -40,12 +40,13 @@ services:
     ports:
       - "127.0.0.1:3308:3306"
     environment:
+      MYSQL_ROOT_PASSWORD: root_password_123
       MYSQL_DATABASE: inventory_db
       MYSQL_USER: inventory_user
       MYSQL_PASSWORD: your_secure_password
-      MYSQL_ROOT_PASSWORD: root_password_123
     volumes:
       - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - inventory_network
     healthcheck:
@@ -54,7 +55,7 @@ services:
       retries: 10
       interval: 10s
       start_period: 40s
-    command: --default-authentication-plugin=mysql_native_password
+    command: --default-authentication-plugin=mysql_native_password --bind-address=0.0.0.0
 
 volumes:
   mysql_data:

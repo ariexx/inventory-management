@@ -88,6 +88,9 @@ jobs:
 
             # Stop containers first and clean up
             docker-compose -f docker-compose.prod.yml down || true
+
+            # Remove MySQL volume to force fresh database initialization
+            docker volume rm $(docker-compose -f docker-compose.prod.yml config --volumes) 2>/dev/null || true
             docker system prune -f
 
             # Copy and configure .env file
