@@ -18,7 +18,7 @@ RUN composer install --no-dev --optimize-autoloader --no-scripts
 COPY package*.json ./
 RUN npm ci
 
-# Copy all files EXCEPT .env (akan di-generate di deploy)
+# Copy all files
 COPY . /var/www
 
 # Build assets
@@ -27,19 +27,27 @@ RUN npm run build
 # Clean up node_modules
 RUN rm -rf node_modules
 
-# JANGAN generate key di sini - biarkan deploy script yang handle
-# RUN php artisan key:generate --no-interaction
-
 # Set permissions
 RUN chown -R www-data:www-data /var/www \
     && chmod -R 755 /var/www/storage \
     && chmod -R 755 /var/www/bootstrap/cache
 
-# Configure PHP-FPM
-RUN echo '[www]' > /usr/local/etc/php-fpm.d/zz-docker.conf \
-    && echo 'user = www-data' >> /usr/local/etc/php-fpm.d/zz-docker.conf \
-    && echo 'group = www-data' >> /usr/local/etc/php-fpm.d/zz-docker.conf \
-    && echo 'listen = 0.0.0.0:9000' >> /usr/local/etc/php-fpm.conf
+# Configure PHP-FPM to listen on port 9000
+RUN echo '[global]' > /usr/local/etc/php-fpm.conf \
+    && echo 'error_log = /proc/self/fd/2' >> /usr/local/etc/php-fpm.conf \
+    && echo '[www]' >> /usr/local/etc/php-fpm.conf \
+    && echo 'user = www-data' >> /usr/local/etc/php-fpm.conf \
+    && echo 'group = www-data' >> /usr/local/etc/php-fpm.conf \
+    && echo 'listen = 0.0.0.0:9000' >> /usr/local/etc/php-fpm.conf \
+    && echo 'listen.mode = 0666' >> /usr/local/etc/php-fpm.conf \
+    && echo 'pm = dynamic' >> /usr/local/etc/php-fpm.conf \
+    && echo 'pm.max_children = 20' >> /usr/local/etc/php-fpm.conf \
+    && echo 'pm.start_servers = 3' >> /usr/local/etc/php-fpm.conf \
+    && echo 'pm.min_spare_servers = 2' >> /usr/local/etc/php-fpm.conf \
+    && echo 'pm.max_spare_servers = 4' >> /usr/local/etc/php-fpm.conf \
+    && echo 'pm.max_requests = 200' >> /usr/local/etc/php-fpm.conf \
+    && echo 'catch_workers_output = yes' >> /usr/local/etc/php-fpm.conf \
+    && echo 'access.log = /proc/self/fd/2' >> /usr/local/etc/php-fpm.conf
 
 EXPOSE 9000
 CMD ["php-fpm"]

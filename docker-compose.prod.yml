@@ -9,13 +9,16 @@ services:
     ports:
       - "127.0.0.1:9000:9000"
     volumes:
-      - ./.env:/var/www/.env
+      - ./storage:/var/www/storage:delegated
+      - ./bootstrap/cache:/var/www/bootstrap/cache:delegated
     environment:
       - APP_ENV=production
+      - CONTAINER_ROLE=app
     networks:
       - inventory_network
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
 
   mysql:
     image: mysql:8.0
@@ -32,6 +35,12 @@ services:
       - mysql_data:/var/lib/mysql
     networks:
       - inventory_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+      interval: 10s
+      start_period: 40s
 
 volumes:
   mysql_data:

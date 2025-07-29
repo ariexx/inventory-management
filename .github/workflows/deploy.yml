@@ -105,11 +105,25 @@ jobs:
             # Start containers
             docker-compose -f docker-compose.prod.yml up -d --build
 
-            # Wait for containers to be ready
-            sleep 60
+            # Wait for MySQL to be ready
+            echo "=== Waiting for MySQL to be ready ==="
+            docker-compose -f docker-compose.prod.yml exec -T mysql sh -c 'while ! mysqladmin ping -h localhost --silent; do sleep 1; done'
 
             echo "=== Generating Laravel Key ==="
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan key:generate --force || echo "Key generation failed"
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan key:generate --force
+
+            echo "=== Running Database Migrations ==="
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan migrate --force
+
+            echo "=== Clearing and Caching Config ==="
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan config:clear
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan config:cache
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan route:cache
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan view:cache
+
+            echo "=== Setting Storage Permissions ==="
+            docker-compose -f docker-compose.prod.yml exec -T app chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
+            docker-compose -f docker-compose.prod.yml exec -T app chmod -R 775 /var/www/storage /var/www/bootstrap/cache
 
             # Debug: Check container status
             echo "=== Container Status ==="
