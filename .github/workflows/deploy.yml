@@ -102,6 +102,10 @@ jobs:
             sed -i 's|DB_PASSWORD=.*|DB_PASSWORD=your_secure_password|' .env
             sed -i 's|SESSION_SECURE_COOKIE=.*|SESSION_SECURE_COOKIE=true|' .env
 
+            # Generate APP_KEY for .env file
+            APP_KEY=$(docker run --rm php:8.2-cli php -r "echo 'base64:'.base64_encode(random_bytes(32));")
+            sed -i "s|APP_KEY=.*|APP_KEY=$APP_KEY|" .env
+
             # Start containers with better error handling
             echo "=== Building and Starting Containers ==="
             if ! docker-compose -f docker-compose.prod.yml up -d --build; then
@@ -110,80 +114,108 @@ jobs:
               exit 1
             fi
 
-            # Wait for containers to be healthy with better timeout
-            echo "=== Waiting for containers to be healthy ==="
-            for i in {1..60}; do
-              if docker-compose -f docker-compose.prod.yml ps | grep -q "healthy"; then
-                echo "Containers are healthy"
+            # Wait for MySQL to be healthy first
+            echo "=== Waiting for MySQL to be healthy ==="
+            MAX_WAIT=300
+            WAITED=0
+            while [ $WAITED -lt $MAX_WAIT ]; do
+              MYSQL_HEALTH=$(docker inspect inventory_mysql --format='{{.State.Health.Status}}' 2>/dev/null || echo "starting")
+              echo "MySQL health: $MYSQL_HEALTH (${WAITED}s)"
+
+              if [ "$MYSQL_HEALTH" = "healthy" ]; then
+                echo "✅ MySQL is healthy!"
                 break
               fi
-              echo "Waiting for containers to be healthy... ($i/60)"
+
+              sleep 10
+              WAITED=$((WAITED + 10))
+            done
+
+            # Test database connection
+            echo "=== Testing Database Connection ==="
+            for i in {1..12}; do
+              if docker-compose -f docker-compose.prod.yml exec -T app php -r "new PDO('mysql:host=mysql;port=3306;dbname=inventory_db', 'inventory_user', 'your_secure_password'); echo 'DB OK';" 2>/dev/null; then
+                echo "✅ Database connection successful!"
+                break
+              fi
+              echo "Waiting for DB connection... ($i/12)"
               sleep 5
             done
 
-            # Check if containers are actually running
-            echo "=== Checking Container Status ==="
-            docker-compose -f docker-compose.prod.yml ps
+            # Wait for app container to be healthy
+            echo "=== Waiting for App Container ==="
+            for i in {1..24}; do
+              APP_HEALTH=$(docker inspect inventory_app --format='{{.State.Health.Status}}' 2>/dev/null || echo "starting")
+              echo "App health: $APP_HEALTH ($i/24)"
 
-            # Only proceed if app container is running
-            if ! docker-compose -f docker-compose.prod.yml exec -T app echo "Container is responsive" 2>/dev/null; then
-              echo "=== Container not responsive, checking logs ==="
-              docker-compose -f docker-compose.prod.yml logs app
-              echo "=== Attempting to restart containers ==="
-              docker-compose -f docker-compose.prod.yml restart app
-              sleep 30
+              if [ "$APP_HEALTH" = "healthy" ]; then
+                echo "✅ App container is healthy!"
+                break
+              fi
+
+              sleep 5
+            done
+
+            # Test container responsiveness
+            echo "=== Testing Container Responsiveness ==="
+            if docker-compose -f docker-compose.prod.yml exec -T app php --version; then
+              echo "✅ PHP is working in container"
+            else
+              echo "❌ PHP is not responsive"
+              docker logs inventory_app --tail 20
+              exit 1
             fi
 
-            # Laravel setup with better error handling
+            # Laravel setup
             echo "=== Setting up Laravel Application ==="
 
             # Generate Laravel Key
             if docker-compose -f docker-compose.prod.yml exec -T app php artisan key:generate --force; then
-              echo "Laravel key generated successfully"
+              echo "✅ Laravel key generated"
             else
-              echo "Failed to generate Laravel key, trying alternative method..."
-              docker-compose -f docker-compose.prod.yml exec -T app php -r "echo 'base64:'.base64_encode(random_bytes(32));" > /tmp/key
-              if [ -s /tmp/key ]; then
-                APP_KEY=$(cat /tmp/key)
-                sed -i "s|APP_KEY=.*|APP_KEY=$APP_KEY|" .env
-                echo "Laravel key set manually"
-              fi
+              echo "❌ Failed to generate Laravel key"
+              exit 1
             fi
 
-            # Database operations with retries
+            # Database migrations with retries
             echo "=== Database Setup ==="
-            for i in {1..3}; do
+            for attempt in 1 2 3; do
+              echo "Migration attempt $attempt/3..."
               if docker-compose -f docker-compose.prod.yml exec -T app php artisan migrate --force; then
-                echo "Database migration completed"
+                echo "✅ Database migration completed"
                 break
               else
-                echo "Migration attempt $i failed, retrying..."
-                sleep 10
+                if [ $attempt -eq 3 ]; then
+                  echo "❌ All migration attempts failed"
+                  exit 1
+                fi
+                echo "Migration failed, retrying in 15 seconds..."
+                sleep 15
               fi
             done
 
             # Cache optimization
             echo "=== Cache Optimization ==="
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan config:clear || echo "Config clear failed"
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan config:cache || echo "Config cache failed"
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan route:cache || echo "Route cache failed"
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan view:cache || echo "View cache failed"
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan storage:link || echo "Storage link failed"
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan config:clear && echo "✅ Config cleared" || echo "⚠️ Config clear failed"
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan config:cache && echo "✅ Config cached" || echo "⚠️ Config cache failed"
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan route:cache && echo "✅ Routes cached" || echo "⚠️ Route cache failed"
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan view:cache && echo "✅ Views cached" || echo "⚠️ View cache failed"
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan storage:link && echo "✅ Storage linked" || echo "⚠️ Storage link failed"
 
             # Set final permissions
             echo "=== Setting Final Permissions ==="
-            docker-compose -f docker-compose.prod.yml exec -T app chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache || echo "Permission setting failed"
-            docker-compose -f docker-compose.prod.yml exec -T app chmod -R 775 /var/www/storage /var/www/bootstrap/cache || echo "Chmod failed"
+            docker-compose -f docker-compose.prod.yml exec -T app chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache && echo "✅ Permissions set" || echo "⚠️ Permission failed"
+            docker-compose -f docker-compose.prod.yml exec -T app chmod -R 775 /var/www/storage /var/www/bootstrap/cache && echo "✅ Chmod applied" || echo "⚠️ Chmod failed"
 
             # Remove any existing nginx config
             sudo rm -f /etc/nginx/sites-enabled/inventory-management.shop
 
             # Configure nginx with better PHP-FPM handling
-            sudo tee /etc/nginx/sites-available/inventory-management.shop > /dev/null <<EOF
+            sudo tee /etc/nginx/sites-available/inventory-management.shop > /dev/null <<'EOF'
             server {
                 listen 80;
                 server_name inventory-management.shop www.inventory-management.shop;
-                return 301 https://\$server_name\$request_uri;
+                return 301 https://$server_name$request_uri;
             }
 
             server {
@@ -198,9 +230,9 @@ jobs:
                 ssl_session_cache shared:SSL:10m;
 
                 access_log /var/log/nginx/inventory_access.log;
-                error_log /var/log/nginx/inventory_error.log debug;
+                error_log /var/log/nginx/inventory_error.log;
 
-                root $PROJECT_DIR/public;
+                root PROJECT_DIR_PLACEHOLDER/public;
                 index index.php index.html index.htm;
 
                 # Increase client body size for file uploads
@@ -212,16 +244,16 @@ jobs:
                 add_header X-Content-Type-Options "nosniff" always;
 
                 location / {
-                    try_files \$uri \$uri/ /index.php?\$query_string;
+                    try_files $uri $uri/ /index.php?$query_string;
                 }
 
                 location ~ \.php$ {
-                    try_files \$uri =404;
+                    try_files $uri =404;
                     fastcgi_split_path_info ^(.+\.php)(/.+)$;
                     fastcgi_pass 127.0.0.1:9000;
                     fastcgi_index index.php;
-                    fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
-                    fastcgi_param PATH_INFO \$fastcgi_path_info;
+                    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+                    fastcgi_param PATH_INFO $fastcgi_path_info;
                     fastcgi_param HTTPS on;
 
                     # Increase timeouts
@@ -243,11 +275,14 @@ jobs:
 
                 # Laravel storage
                 location ^~ /storage/ {
-                    alias $PROJECT_DIR/storage/app/public/;
-                    try_files \$uri =404;
+                    alias PROJECT_DIR_PLACEHOLDER/storage/app/public/;
+                    try_files $uri =404;
                 }
             }
             EOF
+
+            # Replace placeholder with actual project directory
+            sudo sed -i "s|PROJECT_DIR_PLACEHOLDER|$PROJECT_DIR|g" /etc/nginx/sites-available/inventory-management.shop
 
             # Enable site
             sudo ln -sf /etc/nginx/sites-available/inventory-management.shop /etc/nginx/sites-enabled/
@@ -274,13 +309,109 @@ jobs:
 
             echo "=== Final Debug ==="
             echo "Checking if public/index.php exists:"
-            ls -la $PROJECT_DIR/public/index.php || echo "index.php NOT FOUND!"
+            ls -la $PROJECT_DIR/public/index.php || echo "❌ index.php NOT FOUND!"
 
             echo "Testing Laravel via container:"
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan --version || echo "Laravel not working"
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan --version && echo "✅ Laravel is working" || echo "❌ Laravel not working"
 
-            echo "Nginx error logs:"
-            sudo tail -20 /var/log/nginx/inventory_error.log || echo "No nginx errors yet"
+            echo "=== Testing PHP-FPM Connection ==="
+            if timeout 10 bash -c 'until nc -z 127.0.0.1 9000; do sleep 1; done'; then
+              echo "✅ PHP-FPM is accessible on port 9000"
+            else
+              echo "❌ PHP-FPM connection failed"
+            fi
 
+            echo "=== Testing FastCGI Response ==="
+            # Test if PHP-FPM can process a simple PHP script
+            echo '<?php echo "PHP-FPM is working"; ?>' > /tmp/test.php
+            if timeout 10 cgi-fcgi -bind -connect 127.0.0.1:9000 2>&1 | grep -q "working" || echo "Basic PHP-FPM test"; then
+              echo "✅ PHP-FPM can process PHP files"
+            else
+              echo "⚠️ PHP-FPM test inconclusive"
+            fi
 
+            echo "=== Directory Structure Check ==="
+            echo "Project directory contents:"
+            ls -la $PROJECT_DIR/ | head -20
+            echo "Public directory contents:"
+            ls -la $PROJECT_DIR/public/ | head -10
 
+            echo "=== File Permissions Check ==="
+            echo "Project directory ownership:"
+            ls -ld $PROJECT_DIR
+            echo "Public directory ownership:"
+            ls -ld $PROJECT_DIR/public
+            echo "Index.php permissions:"
+            ls -la $PROJECT_DIR/public/index.php 2>/dev/null || echo "index.php missing"
+
+            echo "=== Container Status ==="
+            docker-compose -f docker-compose.prod.yml ps
+
+            echo "=== Health Check Results ==="
+            docker inspect inventory_app --format='App Health: {{.State.Health.Status}}' 2>/dev/null || echo "App container not found"
+            docker inspect inventory_mysql --format='MySQL Health: {{.State.Health.Status}}' 2>/dev/null || echo "MySQL container not found"
+
+            echo "=== Recent Container Logs ==="
+            echo "App logs (last 15 lines):"
+            docker logs inventory_app --tail 15 2>/dev/null || echo "No app logs available"
+
+            echo "MySQL logs (last 5 lines):"
+            docker logs inventory_mysql --tail 5 2>/dev/null || echo "No MySQL logs available"
+
+            echo "=== Nginx Configuration Test ==="
+            if sudo nginx -t; then
+              echo "✅ Nginx configuration is valid"
+              if systemctl is-active --quiet nginx; then
+                echo "✅ Nginx service is running"
+              else
+                echo "❌ Nginx service is not running"
+              fi
+            else
+              echo "❌ Nginx configuration has errors"
+              sudo nginx -t
+            fi
+
+            echo "=== Network Connectivity Test ==="
+            # Test if nginx can reach PHP-FPM
+            if curl -f -s -o /dev/null http://127.0.0.1:9000; then
+              echo "✅ Can connect to PHP-FPM port directly"
+            else
+              echo "⚠️ Direct PHP-FPM connection test inconclusive"
+            fi
+
+            echo "=== Final Application Test ==="
+            # Test HTTP response
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1 2>/dev/null || echo "000")
+            echo "HTTP response code: $HTTP_CODE"
+
+            case $HTTP_CODE in
+              "200") echo "✅ Application is responding correctly" ;;
+              "301"|"302") echo "✅ Application is responding with redirect" ;;
+              "404") echo "❌ Application returning 404 - Check Nginx root path and index.php" ;;
+              "502") echo "❌ Bad Gateway - PHP-FPM connection issue" ;;
+              "503") echo "❌ Service Unavailable - Container or service issue" ;;
+              "000") echo "❌ No response - Connection failed" ;;
+              *) echo "⚠️ Unexpected response code: $HTTP_CODE" ;;
+            esac
+
+            echo "=== HTTPS Test ==="
+            HTTPS_CODE=$(curl -k -s -o /dev/null -w "%{http_code}" https://127.0.0.1 2>/dev/null || echo "000")
+            echo "HTTPS response code: $HTTPS_CODE"
+
+            echo "=== Deployment Summary ==="
+            echo "✅ Deployment completed at $(date)"
+            echo "📂 Project directory: $PROJECT_DIR"
+            echo "🐳 Container status:"
+            docker ps --filter name=inventory --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+            echo "🌐 Application URL: https://inventory-management.shop"
+            echo "🔍 If you see 404 errors, check:"
+            echo "   1. Nginx root path points to: $PROJECT_DIR/public"
+            echo "   2. index.php exists and is readable"
+            echo "   3. PHP-FPM is accessible on 127.0.0.1:9000"
+            echo "   4. Container health status is healthy"
+
+            echo "=== Nginx Error Logs (if any) ==="
+            sudo tail -15 /var/log/nginx/inventory_error.log 2>/dev/null || echo "No nginx error logs found"
+
+            echo "=== Nginx Access Logs (last 5 entries) ==="
+            sudo tail -5 /var/log/nginx/inventory_access.log 2>/dev/null || echo "No nginx access logs found"
