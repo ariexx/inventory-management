@@ -50,6 +50,6 @@ jobs:
 
             # Optional: Clear opcache if using PHP-FPM
             echo "Restarting PHP-FPM to clear opcache..."
-            sudo systemctl restart php8.1-fpm || echo "PHP-FPM restart not required"
+            sudo systemctl restart php8.2-fpm || echo "PHP-FPM restart not required"
 
             echo "Deployment completed successfully"
