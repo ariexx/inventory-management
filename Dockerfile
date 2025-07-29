@@ -14,17 +14,20 @@ WORKDIR /var/www
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --optimize-autoloader --no-scripts
 
-# Copy package.json and install npm
+# Copy package.json and install npm dependencies INCLUDING dev dependencies
 COPY package*.json ./
-RUN npm ci --production
+RUN npm ci  # Remove --production flag untuk build
 
 # Copy all files
 COPY . /var/www
 
-# Build assets
+# Build assets (vite akan tersedia karena dev dependencies di-install)
 RUN npm run build
 
-# Generate Laravel key (important!)
+# Clean up node_modules after build untuk menghemat space
+RUN rm -rf node_modules
+
+# Generate Laravel key
 RUN php artisan key:generate --no-interaction
 
 # Set permissions
