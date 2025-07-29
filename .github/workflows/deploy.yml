@@ -282,3 +282,5 @@ jobs:
             echo "Nginx error logs:"
             sudo tail -20 /var/log/nginx/inventory_error.log || echo "No nginx errors yet"
 
+
+

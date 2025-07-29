@@ -48,3 +48,5 @@ RUN echo '; Custom PHP-FPM pool configuration' >> /usr/local/etc/php-fpm.d/zz-do
 
 EXPOSE 9000
 CMD ["php-fpm"]
+
+
