@@ -46,7 +46,10 @@ RUN echo '; Custom PHP-FPM pool configuration' >> /usr/local/etc/php-fpm.d/zz-do
     && echo 'pm.max_requests = 200' >> /usr/local/etc/php-fpm.d/zz-docker.conf \
     && echo 'catch_workers_output = yes' >> /usr/local/etc/php-fpm.d/zz-docker.conf
 
+# Create a simple health check script
+RUN echo '#!/bin/bash' > /usr/local/bin/health-check.sh \
+    && echo 'nc -z 127.0.0.1 9000 && php-fpm -t' >> /usr/local/bin/health-check.sh \
+    && chmod +x /usr/local/bin/health-check.sh
+
 EXPOSE 9000
 CMD ["php-fpm"]
-
-
