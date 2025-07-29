@@ -1,55 +1,67 @@
+# Gunakan image dasar PHP 8.2 dengan FPM
 FROM php:8.2-fpm
 
-# Install system dependencies + Node.js + netcat for health checks
+# Instalasi dependensi sistem yang dibutuhkan
+# Node.js untuk build aset, netcat untuk health check, mariadb-client untuk koneksi CLI
 RUN apt-get update && apt-get install -y \
-    git curl libpng-dev libonig-dev libxml2-dev zip unzip libzip-dev \
-    mariadb-client nodejs npm netcat-traditional \
+    git \
+    curl \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+    zip \
+    unzip \
+    libzip-dev \
+    mariadb-client \
+    nodejs \
+    npm \
+    netcat-traditional \
+    fcgiwrap \
     && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Salin binary Composer dari image resmi (praktik terbaik)
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
+# Atur direktori kerja
 WORKDIR /var/www
 
-# Copy composer files for caching
+# Salin file dependensi terlebih dahulu untuk memanfaatkan Docker layer caching
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --optimize-autoloader --no-scripts
+# Install dependensi PHP untuk produksi
+RUN composer install --no-interaction --no-plugins --no-scripts --no-dev --prefer-dist --optimize-autoloader
 
-# Copy package.json and install npm
-COPY package*.json ./
+# Salin file dependensi Node.js
+COPY package.json package-lock.json ./
+# Install dependensi NPM dengan 'ci' yang lebih cepat dan konsisten untuk CI/CD
 RUN npm ci
 
-# Copy all files
-COPY . /var/www
+# FIX: Salin sisa kode aplikasi setelah dependensi di-install
+# Ini akan menggunakan file .dockerignore untuk mengecualikan file yang tidak perlu
+COPY . .
 
-# Build assets
+# Build aset front-end untuk produksi
 RUN npm run build
 
-# Clean up node_modules
+# Hapus node_modules setelah build untuk mengurangi ukuran image
 RUN rm -rf node_modules
 
-# Create .env from example if it doesn't exist
-RUN if [ ! -f .env ]; then cp .env.example .env; fi
+# FIX: Hapus pembuatan file .env. Ini harus ditangani saat runtime di host.
 
-# Set permissions - critical for PHP-FPM
-RUN chown -R www-data:www-data /var/www \
-    && chmod -R 755 /var/www/storage \
-    && chmod -R 755 /var/www/bootstrap/cache
+# Atur kepemilikan dan izin yang benar untuk Laravel
+# Pengguna www-data (yang menjalankan PHP-FPM) harus memiliki akses tulis
+RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache \
+    && chmod -R 775 /var/www/storage /var/www/bootstrap/cache
 
-# Don't override the default PHP-FPM config completely
-# Just add our custom pool configuration
-RUN echo '; Custom PHP-FPM pool configuration' >> /usr/local/etc/php-fpm.d/zz-docker.conf \
-    && echo 'pm.max_children = 20' >> /usr/local/etc/php-fpm.d/zz-docker.conf \
-    && echo 'pm.start_servers = 3' >> /usr/local/etc/php-fpm.d/zz-docker.conf \
-    && echo 'pm.min_spare_servers = 2' >> /usr/local/etc/php-fpm.d/zz-docker.conf \
-    && echo 'pm.max_spare_servers = 4' >> /usr/local/etc/php-fpm.d/zz-docker.conf \
-    && echo 'pm.max_requests = 200' >> /usr/local/etc/php-fpm.d/zz-docker.conf \
-    && echo 'catch_workers_output = yes' >> /usr/local/etc/php-fpm.d/zz-docker.conf
-
-# Create a simple health check script
-RUN echo '#!/bin/bash' > /usr/local/bin/health-check.sh \
-    && echo 'nc -z 127.0.0.1 9000 && php-fpm -t' >> /usr/local/bin/health-check.sh \
+# IMPROVEMENT: Skrip health check yang lebih andal
+# Ini akan memeriksa apakah FPM benar-benar dapat memproses permintaan PHP
+RUN echo '#!/bin/sh' > /usr/local/bin/health-check.sh \
+    && echo 'set -e' >> /usr/local/bin/health-check.sh \
+    && echo "SCRIPT_NAME=/health SCRIPT_FILENAME=/health REQUEST_METHOD=GET cgi-fcgi -bind -connect 127.0.0.1:9000" >> /usr/local/bin/health-check.sh \
     && chmod +x /usr/local/bin/health-check.sh
 
+# Expose port yang digunakan oleh PHP-FPM
 EXPOSE 9000
+
+# Jalankan PHP-FPM sebagai perintah utama
 CMD ["php-fpm"]

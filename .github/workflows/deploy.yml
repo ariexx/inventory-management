@@ -53,368 +53,177 @@ jobs:
       - name: Directory Permissions
         run: chmod -R 777 storage bootstrap/cache
 
-  deploy:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    # ... (bagian 'jobs: test:' tetap sama, tidak perlu diubah)
 
-    steps:
-      - name: Deploy to VPS
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          password: ${{ secrets.PASSWORD }}
-          script: |
-            # Use home directory instead of /var/www
-            PROJECT_DIR="$HOME/inventory-management.shop"
+    deploy:
+      needs: test
+      runs-on: ubuntu-latest
+      if: github.ref == 'refs/heads/main'
 
-            git config --global --add safe.directory $PROJECT_DIR
+      steps:
+        - name: Deploy to VPS
+          uses: appleboy/ssh-action@master
+          with:
+            host: ${{ secrets.HOST }}
+            username: ${{ secrets.USERNAME }}
+            password: ${{ secrets.PASSWORD }}
+            script: |
+              set -e # Hentikan skrip jika ada perintah yang gagal
 
-            # Clone or pull project
-            if [ ! -d "$PROJECT_DIR" ]; then
-              git clone https://github.com/ariexx/inventory-management.git $PROJECT_DIR
-            else
+              # --- PERUBAHAN 1: Gunakan path standar dan konsisten ---
+              PROJECT_DIR="/var/www/inventory-management.shop"
+
+              # Buat direktori proyek jika belum ada dan berikan izin ke pengguna deploy
+              echo "=== Preparing Project Directory ==="
+              sudo mkdir -p $PROJECT_DIR
+              sudo chown -R ${{ secrets.USERNAME }}:${{ secrets.USERNAME }} $PROJECT_DIR
+
+              # Pastikan Git bisa beroperasi di direktori ini dengan aman
+              git config --global --add safe.directory $PROJECT_DIR
+
+              # Clone atau pull proyek
+              if [ ! -d "$PROJECT_DIR/.git" ]; then
+                echo "Cloning repository to $PROJECT_DIR..."
+                git clone https://github.com/ariexx/inventory-management.git $PROJECT_DIR
+              else
+                echo "Pulling latest changes into $PROJECT_DIR..."
+                cd $PROJECT_DIR
+                git pull origin main
+              fi
+
               cd $PROJECT_DIR
-              git pull origin main
-            fi
 
-            cd $PROJECT_DIR
+              # Hentikan kontainer yang ada dan bersihkan
+              echo "=== Cleaning Up Old Docker Environment ==="
+              docker-compose -f docker-compose.prod.yml down --remove-orphans || true
+              docker volume rm $(docker-compose -f docker-compose.prod.yml config --volumes) 2>/dev/null || true
 
-            # Create required directories and set permissions
-            mkdir -p storage/logs bootstrap/cache
-            chmod -R 755 storage bootstrap/cache
-            chown -R $USER:$USER $PROJECT_DIR
+              # Siapkan file .env dari example
+              echo "=== Configuring Environment ==="
+              cp .env.example .env
+              sed -i 's|APP_URL=.*|APP_URL=https://inventory-management.shop|' .env
+              sed -i 's|APP_DEBUG=.*|APP_DEBUG=false|' .env
+              sed -i 's|APP_ENV=.*|APP_ENV=production|' .env
+              sed -i 's|DB_HOST=.*|DB_HOST=mysql|' .env
+              sed -i 's|DB_PORT=.*|DB_PORT=3306|' .env
+              sed -i 's|DB_DATABASE=.*|DB_DATABASE=inventory_db|' .env
+              sed -i 's|DB_USERNAME=.*|DB_USERNAME=inventory_user|' .env
+              sed -i 's|DB_PASSWORD=.*|DB_PASSWORD=your_secure_password|' .env
+              sed -i 's|SESSION_SECURE_COOKIE=.*|SESSION_SECURE_COOKIE=true|' .env
 
-            # Stop containers first and clean up
-            docker-compose -f docker-compose.prod.yml down || true
+              # Hasilkan dan sisipkan APP_KEY
+              APP_KEY=$(docker run --rm php:8.2-cli php -r "echo 'base64:'.base64_encode(random_bytes(32));")
+              sed -i "s|APP_KEY=.*|APP_KEY=$APP_KEY|" .env
 
-            # Remove MySQL volume to force fresh database initialization
-            docker volume rm $(docker-compose -f docker-compose.prod.yml config --volumes) 2>/dev/null || true
-            docker system prune -f
+              # Bangun dan jalankan kontainer
+              echo "=== Building and Starting Containers ==="
+              docker-compose -f docker-compose.prod.yml up -d --build
 
-            # Copy and configure .env file
-            cp .env.example .env
-            sed -i 's|APP_URL=.*|APP_URL=https://inventory-management.shop|' .env
-            sed -i 's|APP_DEBUG=.*|APP_DEBUG=false|' .env
-            sed -i 's|APP_ENV=.*|APP_ENV=production|' .env
-            sed -i 's|DB_HOST=.*|DB_HOST=mysql|' .env
-            sed -i 's|DB_PORT=.*|DB_PORT=3306|' .env
-            sed -i 's|DB_DATABASE=.*|DB_DATABASE=inventory_db|' .env
-            sed -i 's|DB_USERNAME=.*|DB_USERNAME=inventory_user|' .env
-            sed -i 's|DB_PASSWORD=.*|DB_PASSWORD=your_secure_password|' .env
-            sed -i 's|SESSION_SECURE_COOKIE=.*|SESSION_SECURE_COOKIE=true|' .env
+              # Tunggu MySQL siap
+              echo "=== Waiting for MySQL to be healthy... ==="
+              timeout 300s bash -c 'until docker inspect --format="{{.State.Health.Status}}" inventory_mysql 2>/dev/null | grep -q "healthy"; do echo -n "."; sleep 5; done'
+              echo "✅ MySQL is healthy!"
 
-            # Generate APP_KEY for .env file
-            APP_KEY=$(docker run --rm php:8.2-cli php -r "echo 'base64:'.base64_encode(random_bytes(32));")
-            sed -i "s|APP_KEY=.*|APP_KEY=$APP_KEY|" .env
+              # Jalankan setup Laravel di dalam kontainer
+              echo "=== Setting up Laravel Application ==="
+              docker-compose -f docker-compose.prod.yml exec -T app php artisan key:generate --force
+              docker-compose -f docker-compose.prod.yml exec -T app php artisan migrate --force
+              docker-compose -f docker-compose.prod.yml exec -T app php artisan optimize:clear
+              docker-compose -f docker-compose.prod.yml exec -T app php artisan config:cache
+              docker-compose -f docker-compose.prod.yml exec -T app php artisan route:cache
+              docker-compose -f docker-compose.prod.yml exec -T app php artisan view:cache
 
-            # Start containers with better error handling
-            echo "=== Building and Starting Containers ==="
-            if ! docker-compose -f docker-compose.prod.yml up -d --build; then
-              echo "Failed to start containers, checking logs..."
-              docker-compose -f docker-compose.prod.yml logs
-              exit 1
-            fi
+              # Pastikan symbolic link dibuat dengan benar di dalam container
+              docker-compose -f docker-compose.prod.yml exec -T app rm -rf public/storage
+              docker-compose -f docker-compose.prod.yml exec -T app php artisan storage:link
 
-            # Wait for MySQL to be healthy first
-            echo "=== Waiting for MySQL to be healthy ==="
-            MAX_WAIT=300
-            WAITED=0
-            while [ $WAITED -lt $MAX_WAIT ]; do
-              MYSQL_HEALTH=$(docker inspect inventory_mysql --format='{{.State.Health.Status}}' 2>/dev/null || echo "starting")
-              echo "MySQL health: $MYSQL_HEALTH (${WAITED}s)"
+              # Atur izin final di dalam kontainer
+              echo "=== Setting Final Permissions in Container ==="
+              docker-compose -f docker-compose.prod.yml exec -T app chown -R www-data:www-data storage bootstrap/cache
+              docker-compose -f docker-compose.prod.yml exec -T app chmod -R 775 storage bootstrap/cache
 
-              if [ "$MYSQL_HEALTH" = "healthy" ]; then
-                echo "✅ MySQL is healthy!"
-                break
-              fi
+              # --- PERUBAHAN 2: Tulis konfigurasi Nginx dengan path dinamis yang benar ---
+              echo "=== Configuring Nginx ==="
+              # Hapus symlink lama jika ada
+              sudo rm -f /etc/nginx/sites-enabled/inventory-management.shop
 
-              sleep 10
-              WAITED=$((WAITED + 10))
-            done
+              # Gunakan EOF tanpa tanda kutip agar shell bisa memasukkan nilai variabel $PROJECT_DIR
+              # Variabel Nginx seperti $server_name harus di-escape dengan backslash (\$)
+              sudo tee /etc/nginx/sites-available/inventory-management.shop > /dev/null <<EOF
+              server {
+                  listen 80;
+                  server_name inventory-management.shop www.inventory-management.shop;
+                  # Redirect semua traffic HTTP ke HTTPS
+                  location / {
+                      return 301 https://\$server_name\$request_uri;
+                  }
+              }
 
-            # Test database connection
-            echo "=== Testing Database Connection ==="
-            for i in {1..12}; do
-              if docker-compose -f docker-compose.prod.yml exec -T app php -r "new PDO('mysql:host=mysql;port=3306;dbname=inventory_db', 'inventory_user', 'your_secure_password'); echo 'DB OK';" 2>/dev/null; then
-                echo "✅ Database connection successful!"
-                break
-              fi
-              echo "Waiting for DB connection... ($i/12)"
-              sleep 5
-            done
+              server {
+                  listen 443 ssl http2;
+                  server_name inventory-management.shop www.inventory-management.shop;
 
-            # Wait for app container to be healthy
-            echo "=== Waiting for App Container ==="
-            for i in {1..24}; do
-              APP_HEALTH=$(docker inspect inventory_app --format='{{.State.Health.Status}}' 2>/dev/null || echo "starting")
-              echo "App health: $APP_HEALTH ($i/24)"
+                  # Path SSL
+                  ssl_certificate /etc/letsencrypt/live/inventory-management.shop/fullchain.pem;
+                  ssl_certificate_key /etc/letsencrypt/live/inventory-management.shop/privkey.pem;
+                  include /etc/letsencrypt/options-ssl-nginx.conf;
+                  ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 
-              if [ "$APP_HEALTH" = "healthy" ]; then
-                echo "✅ App container is healthy!"
-                break
-              fi
+                  # Path Log
+                  access_log /var/log/nginx/inventory_access.log;
+                  error_log /var/log/nginx/inventory_error.log;
 
-              sleep 5
-            done
+                  # === PATH PROYEK YANG BENAR ===
+                  root $PROJECT_DIR/public;
+                  index index.php index.html;
 
-            # Test container responsiveness
-            echo "=== Testing Container Responsiveness ==="
-            if docker-compose -f docker-compose.prod.yml exec -T app php --version; then
-              echo "✅ PHP is working in container"
-            else
-              echo "❌ PHP is not responsive"
-              docker logs inventory_app --tail 20
-              exit 1
-            fi
+                  # Security Headers
+                  add_header X-Frame-Options "SAMEORIGIN" always;
+                  add_header X-XSS-Protection "1; mode=block" always;
+                  add_header X-Content-Type-Options "nosniff" always;
 
-            # Laravel setup
-            echo "=== Setting up Laravel Application ==="
+                  location / {
+                      try_files \$uri \$uri/ /index.php?\$query_string;
+                  }
 
-            # Generate Laravel Key
-            if docker-compose -f docker-compose.prod.yml exec -T app php artisan key:generate --force; then
-              echo "✅ Laravel key generated"
-            else
-              echo "❌ Failed to generate Laravel key"
-              exit 1
-            fi
+                  location ~ \.php\$ {
+                      try_files \$uri =404;
+                      fastcgi_split_path_info ^(.+\.php)(/.+)\$;
+                      # Pastikan docker-compose.prod.yml Anda memetakan port 9000
+                      # dari container 'app' ke host. Contoh: ports: - "9000:9000"
+                      fastcgi_pass 127.0.0.1:9000;
+                      fastcgi_index index.php;
+                      fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+                      include fastcgi_params;
+                  }
 
-            # Database migrations with retries
-            echo "=== Database Setup ==="
-            for attempt in 1 2 3; do
-              echo "Migration attempt $attempt/3..."
-              if docker-compose -f docker-compose.prod.yml exec -T app php artisan migrate --force; then
-                echo "✅ Database migration completed"
-                break
-              else
-                if [ $attempt -eq 3 ]; then
-                  echo "❌ All migration attempts failed"
-                  exit 1
-                fi
-                echo "Migration failed, retrying in 15 seconds..."
-                sleep 15
-              fi
-            done
+                  # === PATH ALIAS STORAGE YANG BENAR ===
+                  location /storage {
+                      alias $PROJECT_DIR/storage/app/public;
+                      try_files \$uri =404;
+                  }
 
-            # Cache optimization
-            echo "=== Cache Optimization ==="
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan config:clear && echo "✅ Config cleared" || echo "⚠️ Config clear failed"
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan config:cache && echo "✅ Config cached" || echo "⚠️ Config cache failed"
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan route:cache && echo "✅ Routes cached" || echo "⚠️ Route cache failed"
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan view:cache && echo "✅ Views cached" || echo "⚠️ View cache failed"
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan storage:link && echo "✅ Storage linked" || echo "⚠️ Storage link failed"
+                  location ~ /\.ht {
+                      deny all;
+                  }
+              }
+              EOF
 
-            # Set final permissions
-            echo "=== Setting Final Permissions ==="
-            docker-compose -f docker-compose.prod.yml exec -T app chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache && echo "✅ Permissions set" || echo "⚠️ Permission failed"
-            docker-compose -f docker-compose.prod.yml exec -T app chmod -R 775 /var/www/storage /var/www/bootstrap/cache && echo "✅ Chmod applied" || echo "⚠️ Chmod failed"
+              # --- PERUBAHAN 3: Hapus 'sed' yang tidak perlu ---
+              # Baris 'sed' untuk mengganti placeholder sudah tidak diperlukan lagi.
 
-            # Remove any existing nginx config
-            sudo rm -f /etc/nginx/sites-enabled/inventory-management.shop
+              # Aktifkan site dan reload Nginx
+              echo "=== Activating Site and Reloading Nginx ==="
+              sudo ln -sf /etc/nginx/sites-available/inventory-management.shop /etc/nginx/sites-enabled/
 
-            # Configure nginx with better PHP-FPM handling
-            sudo tee /etc/nginx/sites-available/inventory-management.shop > /dev/null <<'EOF'
-            server {
-                listen 80;
-                server_name inventory-management.shop www.inventory-management.shop;
-                return 301 https://$server_name$request_uri;
-            }
-
-            server {
-                listen 443 ssl http2;
-                server_name inventory-management.shop www.inventory-management.shop;
-
-                ssl_certificate /etc/letsencrypt/live/inventory-management.shop/fullchain.pem;
-                ssl_certificate_key /etc/letsencrypt/live/inventory-management.shop/privkey.pem;
-
-                ssl_protocols TLSv1.2 TLSv1.3;
-                ssl_prefer_server_ciphers on;
-                ssl_session_cache shared:SSL:10m;
-
-                access_log /var/log/nginx/inventory_access.log;
-                error_log /var/log/nginx/inventory_error.log;
-
-                root PROJECT_DIR_PLACEHOLDER/public;
-                index index.php index.html index.htm;
-
-                # Increase client body size for file uploads
-                client_max_body_size 10M;
-
-                # Security headers
-                add_header X-Frame-Options "SAMEORIGIN" always;
-                add_header X-XSS-Protection "1; mode=block" always;
-                add_header X-Content-Type-Options "nosniff" always;
-
-                location / {
-                    try_files $uri $uri/ /index.php?$query_string;
-                }
-
-                location ~ \.php$ {
-                    try_files $uri =404;
-                    fastcgi_split_path_info ^(.+\.php)(/.+)$;
-                    fastcgi_pass 127.0.0.1:9000;
-                    fastcgi_index index.php;
-                    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-                    fastcgi_param PATH_INFO $fastcgi_path_info;
-                    fastcgi_param HTTPS on;
-
-                    # Increase timeouts
-                    fastcgi_connect_timeout 60s;
-                    fastcgi_send_timeout 60s;
-                    fastcgi_read_timeout 60s;
-
-                    include fastcgi_params;
-                }
-
-                location ~ /\.ht {
-                    deny all;
-                }
-
-                location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
-                    expires 1y;
-                    add_header Cache-Control "public, immutable";
-                }
-
-                # Laravel storage
-                location ^~ /storage/ {
-                    alias PROJECT_DIR_PLACEHOLDER/storage/app/public/;
-                    try_files $uri =404;
-                }
-            }
-            EOF
-
-            # Replace placeholder with actual project directory
-            sudo sed -i "s|PROJECT_DIR_PLACEHOLDER|$PROJECT_DIR|g" /etc/nginx/sites-available/inventory-management.shop
-
-            # Enable site
-            sudo ln -sf /etc/nginx/sites-available/inventory-management.shop /etc/nginx/sites-enabled/
-
-            # Test nginx config
-            echo "=== Testing Nginx Configuration ==="
-            if sudo nginx -t; then
-              if ! sudo systemctl is-active --quiet nginx; then
-                echo "Starting nginx service..."
-                sudo systemctl start nginx
-              else
-                echo "Reloading nginx service..."
+              # Cek konfigurasi Nginx sebelum me-reload
+              if sudo nginx -t; then
                 sudo systemctl reload nginx
-              fi
-
-              # Final test
-              echo "=== Final Tests ==="
-              curl -I http://127.0.0.1 || echo "Local HTTP test failed"
-              systemctl status nginx --no-pager
-            else
-              echo "Nginx configuration test failed"
-              exit 1
-            fi
-
-            echo "=== Final Debug ==="
-            echo "Checking if public/index.php exists:"
-            ls -la $PROJECT_DIR/public/index.php || echo "❌ index.php NOT FOUND!"
-
-            echo "Testing Laravel via container:"
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan --version && echo "✅ Laravel is working" || echo "❌ Laravel not working"
-
-            echo "=== Testing PHP-FPM Connection ==="
-            if timeout 10 bash -c 'until nc -z 127.0.0.1 9000; do sleep 1; done'; then
-              echo "✅ PHP-FPM is accessible on port 9000"
-            else
-              echo "❌ PHP-FPM connection failed"
-            fi
-
-            echo "=== Testing FastCGI Response ==="
-            # Test if PHP-FPM can process a simple PHP script
-            echo '<?php echo "PHP-FPM is working"; ?>' > /tmp/test.php
-            if timeout 10 cgi-fcgi -bind -connect 127.0.0.1:9000 2>&1 | grep -q "working" || echo "Basic PHP-FPM test"; then
-              echo "✅ PHP-FPM can process PHP files"
-            else
-              echo "⚠️ PHP-FPM test inconclusive"
-            fi
-
-            echo "=== Directory Structure Check ==="
-            echo "Project directory contents:"
-            ls -la $PROJECT_DIR/ | head -20
-            echo "Public directory contents:"
-            ls -la $PROJECT_DIR/public/ | head -10
-
-            echo "=== File Permissions Check ==="
-            echo "Project directory ownership:"
-            ls -ld $PROJECT_DIR
-            echo "Public directory ownership:"
-            ls -ld $PROJECT_DIR/public
-            echo "Index.php permissions:"
-            ls -la $PROJECT_DIR/public/index.php 2>/dev/null || echo "index.php missing"
-
-            echo "=== Container Status ==="
-            docker-compose -f docker-compose.prod.yml ps
-
-            echo "=== Health Check Results ==="
-            docker inspect inventory_app --format='App Health: {{.State.Health.Status}}' 2>/dev/null || echo "App container not found"
-            docker inspect inventory_mysql --format='MySQL Health: {{.State.Health.Status}}' 2>/dev/null || echo "MySQL container not found"
-
-            echo "=== Recent Container Logs ==="
-            echo "App logs (last 15 lines):"
-            docker logs inventory_app --tail 15 2>/dev/null || echo "No app logs available"
-
-            echo "MySQL logs (last 5 lines):"
-            docker logs inventory_mysql --tail 5 2>/dev/null || echo "No MySQL logs available"
-
-            echo "=== Nginx Configuration Test ==="
-            if sudo nginx -t; then
-              echo "✅ Nginx configuration is valid"
-              if systemctl is-active --quiet nginx; then
-                echo "✅ Nginx service is running"
+                echo "✅ Nginx reloaded successfully."
               else
-                echo "❌ Nginx service is not running"
+                echo "❌ Nginx configuration test FAILED. Check the output above."
+                exit 1
               fi
-            else
-              echo "❌ Nginx configuration has errors"
-              sudo nginx -t
-            fi
 
-            echo "=== Network Connectivity Test ==="
-            # Test if nginx can reach PHP-FPM
-            if curl -f -s -o /dev/null http://127.0.0.1:9000; then
-              echo "✅ Can connect to PHP-FPM port directly"
-            else
-              echo "⚠️ Direct PHP-FPM connection test inconclusive"
-            fi
-
-            echo "=== Final Application Test ==="
-            # Test HTTP response
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1 2>/dev/null || echo "000")
-            echo "HTTP response code: $HTTP_CODE"
-
-            case $HTTP_CODE in
-              "200") echo "✅ Application is responding correctly" ;;
-              "301"|"302") echo "✅ Application is responding with redirect" ;;
-              "404") echo "❌ Application returning 404 - Check Nginx root path and index.php" ;;
-              "502") echo "❌ Bad Gateway - PHP-FPM connection issue" ;;
-              "503") echo "❌ Service Unavailable - Container or service issue" ;;
-              "000") echo "❌ No response - Connection failed" ;;
-              *) echo "⚠️ Unexpected response code: $HTTP_CODE" ;;
-            esac
-
-            echo "=== HTTPS Test ==="
-            HTTPS_CODE=$(curl -k -s -o /dev/null -w "%{http_code}" https://127.0.0.1 2>/dev/null || echo "000")
-            echo "HTTPS response code: $HTTPS_CODE"
-
-            echo "=== Deployment Summary ==="
-            echo "✅ Deployment completed at $(date)"
-            echo "📂 Project directory: $PROJECT_DIR"
-            echo "🐳 Container status:"
-            docker ps --filter name=inventory --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
-            echo "🌐 Application URL: https://inventory-management.shop"
-            echo "🔍 If you see 404 errors, check:"
-            echo "   1. Nginx root path points to: $PROJECT_DIR/public"
-            echo "   2. index.php exists and is readable"
-            echo "   3. PHP-FPM is accessible on 127.0.0.1:9000"
-            echo "   4. Container health status is healthy"
-
-            echo "=== Nginx Error Logs (if any) ==="
-            sudo tail -15 /var/log/nginx/inventory_error.log 2>/dev/null || echo "No nginx error logs found"
-
-            echo "=== Nginx Access Logs (last 5 entries) ==="
-            sudo tail -5 /var/log/nginx/inventory_access.log 2>/dev/null || echo "No nginx access logs found"
+              echo "🚀 Deployment completed successfully!"
+              echo "URL: https://inventory-management.shop"
