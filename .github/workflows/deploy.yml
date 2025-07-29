@@ -66,13 +66,21 @@ jobs:
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASSWORD }}
           script: |
+            # Fix git ownership issue
+            sudo git config --global --add safe.directory /var/www/inventory-management.shop
+
             cd /var/www/inventory-management.shop
             git pull origin main
-            docker-compose down
-            docker-compose up -d --build
-            docker-compose exec -T app composer install --no-dev --optimize-autoloader
-            docker-compose exec -T app php artisan migrate --force
-            docker-compose exec -T app php artisan config:cache
-            docker-compose exec -T app php artisan route:cache
-            docker-compose exec -T app php artisan view:cache
+
+            # Use specific docker-compose file
+            docker-compose -f docker-compose.prod.yml down
+            docker-compose -f docker-compose.prod.yml up -d --build
+            docker-compose -f docker-compose.prod.yml exec -T app composer install --no-dev --optimize-autoloader
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan migrate --force
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan config:cache
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan route:cache
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan view:cache
+
+            # Test and reload nginx separately
+            sudo nginx -t
             sudo systemctl reload nginx
