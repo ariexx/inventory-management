@@ -1,227 +1,206 @@
 name: Deploy to Production
 
-  on:
-    push:
-      branches: [ main ]
-    pull_request:
-      branches: [ main ]
+on:
+  push:
+    branches: [ main ]
 
-  jobs:
-    test:
-      runs-on: ubuntu-latest
+jobs:
+  test:
+    runs-on: ubuntu-latest
 
-      services:
-        mysql:
-          image: mysql:8.0
-          env:
-            MYSQL_ROOT_PASSWORD: root
-            MYSQL_DATABASE: inventory_2025_test
-          ports:
-            - 3306:3306
-          options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: inventory_2025_test
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
 
-      steps:
-        - uses: actions/checkout@v3
+    steps:
+      - uses: actions/checkout@v4
 
-        - name: Setup PHP
-          uses: shivammathur/setup-php@v2
-          with:
-            php-version: '8.2'
-            extensions: mbstring, dom, fileinfo, mysql, gd
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, dom, fileinfo, mysql, gd
 
-        - name: Setup Node.js
-          uses: actions/setup-node@v3
-          with:
-            node-version: '18'
-            cache: 'npm'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
 
-        - name: Copy .env
-          run: php -r "file_exists('.env') || copy('.env.example', '.env');"
+      - name: Copy .env
+        run: php -r "file_exists('.env') || copy('.env.example', '.env');"
 
-        - name: Install PHP Dependencies
-          run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
+      - name: Install PHP Dependencies
+        run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
 
-        - name: Install NPM Dependencies
-          run: npm ci
+      - name: Install NPM Dependencies
+        run: npm ci
 
-        - name: Build Assets
-          run: npm run build
+      - name: Build Assets
+        run: npm run build
 
-        - name: Generate key
-          run: php artisan key:generate
+      - name: Generate key
+        run: php artisan key:generate
 
-        - name: Directory Permissions
-          run: chmod -R 777 storage bootstrap/cache
+      - name: Directory Permissions
+        run: chmod -R 777 storage bootstrap/cache
 
-    deploy:
-      needs: test
-      runs-on: ubuntu-latest
-      if: github.ref == 'refs/heads/main'
+      - name: Run Tests
+        run: php artisan test
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: inventory_2025_test
+          DB_USERNAME: root
+          DB_PASSWORD: root
 
-      steps:
-        - name: Deploy to VPS
-          uses: appleboy/ssh-action@master
-          with:
-            host: ${{ secrets.HOST }}
-            username: ${{ secrets.USERNAME }}
-            password: ${{ secrets.PASSWORD }}
-            script: |
-              set -e # Hentikan skrip jika ada perintah yang gagal
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
 
-              # --- PERUBAHAN 1: Gunakan path standar dan konsisten ---
-              PROJECT_DIR="/var/www/inventory-management.shop"
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
 
-              # Buat direktori proyek jika belum ada dan berikan izin ke pengguna deploy
-              echo "=== Preparing Project Directory ==="
-              sudo mkdir -p $PROJECT_DIR
-              sudo chown -R ${{ secrets.USERNAME }}:${{ secrets.USERNAME }} $PROJECT_DIR
+            PROJECT_DIR="/var/www/inventory-management.shop"
 
-              # Pastikan Git bisa beroperasi di direktori ini dengan aman
-              git config --global --add safe.directory $PROJECT_DIR
+            echo "=== Preparing Project Directory ==="
+            sudo mkdir -p $PROJECT_DIR
+            sudo chown -R ${{ secrets.USERNAME }}:${{ secrets.USERNAME }} $PROJECT_DIR
 
-              # Clone atau pull proyek
-              if [ ! -d "$PROJECT_DIR/.git" ]; then
-                echo "Cloning repository to $PROJECT_DIR..."
-                git clone https://github.com/ariexx/inventory-management.git $PROJECT_DIR
-              else
-                echo "Pulling latest changes into $PROJECT_DIR..."
-                cd $PROJECT_DIR
-                git pull origin main
-              fi
+            git config --global --add safe.directory $PROJECT_DIR
 
+            if [ ! -d "$PROJECT_DIR/.git" ]; then
+              echo "Cloning repository to $PROJECT_DIR..."
+              git clone https://github.com/ariexx/inventory-management.git $PROJECT_DIR
+            else
+              echo "Pulling latest changes into $PROJECT_DIR..."
               cd $PROJECT_DIR
+              git fetch origin
+              git reset --hard origin/main
+            fi
 
-              # Hentikan kontainer yang ada dan bersihkan
-              echo "=== Cleaning Up Old Docker Environment ==="
-              docker-compose -f docker-compose.prod.yml down --remove-orphans || true
-              docker volume rm $(docker-compose -f docker-compose.prod.yml config --volumes) 2>/dev/null || true
+            cd $PROJECT_DIR
 
-              # Siapkan file .env dari example
-              echo "=== Configuring Environment ==="
-              cp .env.example .env
-              sed -i 's|APP_URL=.*|APP_URL=https://inventory-management.shop|' .env
-              sed -i 's|APP_DEBUG=.*|APP_DEBUG=false|' .env
-              sed -i 's|APP_ENV=.*|APP_ENV=production|' .env
-              sed -i 's|DB_HOST=.*|DB_HOST=mysql|' .env
-              sed -i 's|DB_PORT=.*|DB_PORT=3306|' .env
-              sed -i 's|DB_DATABASE=.*|DB_DATABASE=inventory_db|' .env
-              sed -i 's|DB_USERNAME=.*|DB_USERNAME=inventory_user|' .env
-              sed -i 's|DB_PASSWORD=.*|DB_PASSWORD=your_secure_password|' .env
-              sed -i 's|SESSION_SECURE_COOKIE=.*|SESSION_SECURE_COOKIE=true|' .env
+            echo "=== Cleaning Up Old Docker Environment ==="
+            docker-compose -f docker-compose.prod.yml down --remove-orphans || true
 
-              # Hasilkan dan sisipkan APP_KEY
-              APP_KEY=$(docker run --rm php:8.2-cli php -r "echo 'base64:'.base64_encode(random_bytes(32));")
-              sed -i "s|APP_KEY=.*|APP_KEY=$APP_KEY|" .env
+            echo "=== Configuring Environment ==="
+            cp .env.example .env
+            sed -i 's|APP_URL=.*|APP_URL=https://inventory-management.shop|' .env
+            sed -i 's|APP_DEBUG=.*|APP_DEBUG=false|' .env
+            sed -i 's|APP_ENV=.*|APP_ENV=production|' .env
+            sed -i 's|DB_HOST=.*|DB_HOST=mysql|' .env
+            sed -i 's|DB_PORT=.*|DB_PORT=3306|' .env
+            sed -i 's|DB_DATABASE=.*|DB_DATABASE=inventory_db|' .env
+            sed -i 's|DB_USERNAME=.*|DB_USERNAME=inventory_user|' .env
+            sed -i 's|DB_PASSWORD=.*|DB_PASSWORD=${{ secrets.DB_PASSWORD }}|' .env
+            sed -i 's|SESSION_SECURE_COOKIE=.*|SESSION_SECURE_COOKIE=true|' .env
 
-              # Bangun dan jalankan kontainer
-              echo "=== Building and Starting Containers ==="
-              docker-compose -f docker-compose.prod.yml up -d --build
+            APP_KEY=$(docker run --rm php:8.2-cli php -r "echo 'base64:'.base64_encode(random_bytes(32));")
+            sed -i "s|APP_KEY=.*|APP_KEY=$APP_KEY|" .env
 
-              # Tunggu MySQL siap
-              echo "=== Waiting for MySQL to be healthy... ==="
-              timeout 300s bash -c 'until docker inspect --format="{{.State.Health.Status}}" inventory_mysql 2>/dev/null | grep -q "healthy"; do echo -n "."; sleep 5; done'
-              echo "✅ MySQL is healthy!"
+            echo "=== Building and Starting Containers ==="
+            docker-compose -f docker-compose.prod.yml up -d --build
 
-              # Jalankan setup Laravel di dalam kontainer
-              echo "=== Setting up Laravel Application ==="
-              docker-compose -f docker-compose.prod.yml exec -T app php artisan key:generate --force
-              docker-compose -f docker-compose.prod.yml exec -T app php artisan migrate --force
-              docker-compose -f docker-compose.prod.yml exec -T app php artisan optimize:clear
-              docker-compose -f docker-compose.prod.yml exec -T app php artisan config:cache
-              docker-compose -f docker-compose.prod.yml exec -T app php artisan route:cache
-              docker-compose -f docker-compose.prod.yml exec -T app php artisan view:cache
+            echo "=== Waiting for MySQL to be healthy ==="
+            timeout 300s bash -c 'until docker-compose -f docker-compose.prod.yml exec -T mysql mysqladmin ping -h localhost --silent; do echo -n "."; sleep 5; done'
+            echo "✅ MySQL is ready!"
 
-              # Pastikan symbolic link dibuat dengan benar di dalam container
-              docker-compose -f docker-compose.prod.yml exec -T app rm -rf public/storage
-              docker-compose -f docker-compose.prod.yml exec -T app php artisan storage:link
+            echo "=== Setting up Laravel Application ==="
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan key:generate --force
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan migrate --force
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan optimize:clear
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan config:cache
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan route:cache
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan view:cache
 
-              # Atur izin final di dalam kontainer
-              echo "=== Setting Final Permissions in Container ==="
-              docker-compose -f docker-compose.prod.yml exec -T app chown -R www-data:www-data storage bootstrap/cache
-              docker-compose -f docker-compose.prod.yml exec -T app chmod -R 775 storage bootstrap/cache
+            docker-compose -f docker-compose.prod.yml exec -T app rm -rf public/storage
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan storage:link
 
-              # --- PERUBAHAN 2: Tulis konfigurasi Nginx dengan path dinamis yang benar ---
-              echo "=== Configuring Nginx ==="
-              # Hapus symlink lama jika ada
-              sudo rm -f /etc/nginx/sites-enabled/inventory-management.shop
+            echo "=== Setting Final Permissions ==="
+            docker-compose -f docker-compose.prod.yml exec -T app chown -R www-data:www-data storage bootstrap/cache
+            docker-compose -f docker-compose.prod.yml exec -T app chmod -R 775 storage bootstrap/cache
 
-              # Gunakan EOF tanpa tanda kutip agar shell bisa memasukkan nilai variabel $PROJECT_DIR
-              # Variabel Nginx seperti $server_name harus di-escape dengan backslash (\$)
-              sudo tee /etc/nginx/sites-available/inventory-management.shop > /dev/null <<EOF
-              server {
-                  listen 80;
-                  server_name inventory-management.shop www.inventory-management.shop;
-                  # Redirect semua traffic HTTP ke HTTPS
-                  location / {
-                      return 301 https://\$server_name\$request_uri;
-                  }
-              }
+            echo "=== Configuring Nginx ==="
+            sudo rm -f /etc/nginx/sites-enabled/inventory-management.shop
 
-              server {
-                  listen 443 ssl http2;
-                  server_name inventory-management.shop www.inventory-management.shop;
+            sudo tee /etc/nginx/sites-available/inventory-management.shop > /dev/null <<'EOF'
+            server {
+                listen 80;
+                server_name inventory-management.shop www.inventory-management.shop;
+                location / {
+                    return 301 https://$server_name$request_uri;
+                }
+            }
 
-                  # Path SSL
-                  ssl_certificate /etc/letsencrypt/live/inventory-management.shop/fullchain.pem;
-                  ssl_certificate_key /etc/letsencrypt/live/inventory-management.shop/privkey.pem;
-                  include /etc/letsencrypt/options-ssl-nginx.conf;
-                  ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+            server {
+                listen 443 ssl http2;
+                server_name inventory-management.shop www.inventory-management.shop;
 
-                  # Path Log
-                  access_log /var/log/nginx/inventory_access.log;
-                  error_log /var/log/nginx/inventory_error.log;
+                ssl_certificate /etc/letsencrypt/live/inventory-management.shop/fullchain.pem;
+                ssl_certificate_key /etc/letsencrypt/live/inventory-management.shop/privkey.pem;
+                include /etc/letsencrypt/options-ssl-nginx.conf;
+                ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 
-                  # === PATH PROYEK YANG BENAR ===
-                  root $PROJECT_DIR/public;
-                  index index.php index.html;
+                access_log /var/log/nginx/inventory_access.log;
+                error_log /var/log/nginx/inventory_error.log;
 
-                  # Security Headers
-                  add_header X-Frame-Options "SAMEORIGIN" always;
-                  add_header X-XSS-Protection "1; mode=block" always;
-                  add_header X-Content-Type-Options "nosniff" always;
+                root /var/www/inventory-management.shop/public;
+                index index.php index.html;
 
-                  location / {
-                      try_files \$uri \$uri/ /index.php?\$query_string;
-                  }
+                add_header X-Frame-Options "SAMEORIGIN" always;
+                add_header X-XSS-Protection "1; mode=block" always;
+                add_header X-Content-Type-Options "nosniff" always;
 
-                  location ~ \.php\$ {
-                      try_files \$uri =404;
-                      fastcgi_split_path_info ^(.+\.php)(/.+)\$;
-                      # Pastikan docker-compose.prod.yml Anda memetakan port 9000
-                      # dari container 'app' ke host. Contoh: ports: - "9000:9000"
-                      fastcgi_pass 127.0.0.1:9000;
-                      fastcgi_index index.php;
-                      fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
-                      include fastcgi_params;
-                  }
+                location / {
+                    try_files $uri $uri/ /index.php?$query_string;
+                }
 
-                  # === PATH ALIAS STORAGE YANG BENAR ===
-                  location /storage {
-                      alias $PROJECT_DIR/storage/app/public;
-                      try_files \$uri =404;
-                  }
+                location ~ \.php$ {
+                    try_files $uri =404;
+                    fastcgi_split_path_info ^(.+\.php)(/.+)$;
+                    fastcgi_pass 127.0.0.1:9000;
+                    fastcgi_index index.php;
+                    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+                    include fastcgi_params;
+                }
 
-                  location ~ /\.ht {
-                      deny all;
-                  }
-              }
-              EOF
+                location /storage {
+                    alias /var/www/inventory-management.shop/storage/app/public;
+                    try_files $uri =404;
+                }
 
-              # --- PERUBAHAN 3: Hapus 'sed' yang tidak perlu ---
-              # Baris 'sed' untuk mengganti placeholder sudah tidak diperlukan lagi.
+                location ~ /\.ht {
+                    deny all;
+                }
+            }
+            EOF
 
-              # Aktifkan site dan reload Nginx
-              echo "=== Activating Site and Reloading Nginx ==="
-              sudo ln -sf /etc/nginx/sites-available/inventory-management.shop /etc/nginx/sites-enabled/
+            echo "=== Activating Site and Reloading Nginx ==="
+            sudo ln -sf /etc/nginx/sites-available/inventory-management.shop /etc/nginx/sites-enabled/
 
-              # Cek konfigurasi Nginx sebelum me-reload
-              if sudo nginx -t; then
-                sudo systemctl reload nginx
-                echo "✅ Nginx reloaded successfully."
-              else
-                echo "❌ Nginx configuration test FAILED. Check the output above."
-                exit 1
-              fi
+            if sudo nginx -t; then
+              sudo systemctl reload nginx
+              echo "✅ Nginx reloaded successfully."
+            else
+              echo "❌ Nginx configuration test FAILED."
+              exit 1
+            fi
 
-              echo "🚀 Deployment completed successfully!"
-              echo "URL: https://inventory-management.shop"
+            echo "🚀 Deployment completed successfully!"
+            echo "URL: https://inventory-management.shop"
