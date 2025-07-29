@@ -53,8 +53,6 @@ jobs:
       - name: Directory Permissions
         run: chmod -R 777 storage bootstrap/cache
 
-    # ... (bagian 'jobs: test:' tetap sama, tidak perlu diubah)
-
     deploy:
       needs: test
       runs-on: ubuntu-latest
