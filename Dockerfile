@@ -9,14 +9,9 @@ RUN apt-get update && apt-get install -y \
     libxml2-dev \
     zip \
     unzip \
-    nodejs \
-    npm
-
-# Clear cache
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Install PHP extensions
-RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
+    libzip-dev \
+    mariadb-client \
+    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
 
 # Get latest Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -24,17 +19,26 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Set working directory
 WORKDIR /var/www
 
-# Copy application
+# Copy existing application directory contents
 COPY . /var/www
-COPY --chown=www-data:www-data . /var/www
 
-# Install dependencies
-RUN composer install --no-dev --optimize-autoloader
-RUN npm install && npm run build
+# Set permissions
+RUN chown -R www-data:www-data /var/www \
+    && chmod -R 755 /var/www/storage \
+    && chmod -R 755 /var/www/bootstrap/cache
 
-# Change user
-USER www-data
+# Configure PHP-FPM to listen on 0.0.0.0:9000
+RUN echo '[www]' > /usr/local/etc/php-fpm.d/zz-docker.conf \
+    && echo 'user = www-data' >> /usr/local/etc/php-fpm.d/zz-docker.conf \
+    && echo 'group = www-data' >> /usr/local/etc/php-fpm.d/zz-docker.conf \
+    && echo 'listen = 0.0.0.0:9000' >> /usr/local/etc/php-fpm.d/zz-docker.conf \
+    && echo 'pm = dynamic' >> /usr/local/etc/php-fpm.d/zz-docker.conf \
+    && echo 'pm.max_children = 20' >> /usr/local/etc/php-fpm.d/zz-docker.conf \
+    && echo 'pm.start_servers = 3' >> /usr/local/etc/php-fpm.d/zz-docker.conf \
+    && echo 'pm.min_spare_servers = 2' >> /usr/local/etc/php-fpm.d/zz-docker.conf \
+    && echo 'pm.max_spare_servers = 4' >> /usr/local/etc/php-fpm.d/zz-docker.conf
 
-# Expose port
+# Expose port 9000 and start php-fpm server
 EXPOSE 9000
+
 CMD ["php-fpm"]

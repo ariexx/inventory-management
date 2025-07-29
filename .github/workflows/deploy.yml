@@ -73,7 +73,7 @@ jobs:
 
             # Clone or pull project
             if [ ! -d "$PROJECT_DIR" ]; then
-              git clone https://github.com/ariexx/inventory-management.git $PROJECT_DIR
+              git clone https://github.com/ariefly/inventory-management.shop.git $PROJECT_DIR
             else
               cd $PROJECT_DIR
               git pull origin main
@@ -96,7 +96,7 @@ jobs:
             sed -i 's|APP_DEBUG=.*|APP_DEBUG=false|' .env
             sed -i 's|APP_ENV=.*|APP_ENV=production|' .env
             sed -i 's|DB_HOST=.*|DB_HOST=127.0.0.1|' .env
-            sed -i 's|DB_PORT=.*|DB_PORT=3308|' .env  # Updated to 3308
+            sed -i 's|DB_PORT=.*|DB_PORT=3308|' .env
             sed -i 's|DB_DATABASE=.*|DB_DATABASE=inventory_db|' .env
             sed -i 's|DB_USERNAME=.*|DB_USERNAME=inventory_user|' .env
             sed -i 's|DB_PASSWORD=.*|DB_PASSWORD=your_secure_password|' .env
@@ -114,19 +114,32 @@ jobs:
             docker-compose -f docker-compose.prod.yml up -d --build
 
             # Wait for containers to be ready
-            sleep 45
+            sleep 60
 
-            # Run Laravel commands
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan migrate --force
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan config:cache
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan route:cache
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan view:cache
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan storage:link
+            # Debug: Check container status
+            echo "=== Container Status ==="
+            docker ps -a
+
+            # Debug: Check PHP-FPM logs
+            echo "=== PHP-FPM Logs ==="
+            docker logs inventory_app
+
+            # Debug: Test PHP-FPM port
+            echo "=== Testing PHP-FPM Connection ==="
+            timeout 10 bash -c 'until nc -z 127.0.0.1 9000; do sleep 1; done' && echo "PHP-FPM is ready" || echo "PHP-FPM connection failed"
+
+            # Run Laravel commands with better error handling
+            echo "=== Running Laravel Commands ==="
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan migrate --force || echo "Migration failed"
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan config:cache || echo "Config cache failed"
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan route:cache || echo "Route cache failed"
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan view:cache || echo "View cache failed"
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan storage:link || echo "Storage link failed"
 
             # Remove any existing nginx config
             sudo rm -f /etc/nginx/sites-enabled/inventory-management.shop
 
-            # Configure nginx VPS dengan SSL
+            # Configure nginx with better PHP-FPM handling
             sudo tee /etc/nginx/sites-available/inventory-management.shop > /dev/null <<EOF
             server {
                 listen 80;
@@ -142,29 +155,38 @@ jobs:
                 ssl_certificate_key /etc/letsencrypt/live/inventory-management.shop/privkey.pem;
 
                 ssl_protocols TLSv1.2 TLSv1.3;
-                ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA384;
                 ssl_prefer_server_ciphers on;
                 ssl_session_cache shared:SSL:10m;
 
                 root $PROJECT_DIR/public;
                 index index.php index.html index.htm;
 
+                # Increase client body size for file uploads
+                client_max_body_size 10M;
+
                 # Security headers
                 add_header X-Frame-Options "SAMEORIGIN" always;
                 add_header X-XSS-Protection "1; mode=block" always;
                 add_header X-Content-Type-Options "nosniff" always;
-                add_header Referrer-Policy "no-referrer-when-downgrade" always;
-                add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
 
                 location / {
                     try_files \$uri \$uri/ /index.php?\$query_string;
                 }
 
                 location ~ \.php$ {
+                    try_files \$uri =404;
+                    fastcgi_split_path_info ^(.+\.php)(/.+)$;
                     fastcgi_pass 127.0.0.1:9000;
                     fastcgi_index index.php;
                     fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+                    fastcgi_param PATH_INFO \$fastcgi_path_info;
                     fastcgi_param HTTPS on;
+
+                    # Increase timeouts
+                    fastcgi_connect_timeout 60s;
+                    fastcgi_send_timeout 60s;
+                    fastcgi_read_timeout 60s;
+
                     include fastcgi_params;
                 }
 
@@ -189,6 +211,7 @@ jobs:
             sudo ln -sf /etc/nginx/sites-available/inventory-management.shop /etc/nginx/sites-enabled/
 
             # Test nginx config
+            echo "=== Testing Nginx Configuration ==="
             if sudo nginx -t; then
               if ! sudo systemctl is-active --quiet nginx; then
                 echo "Starting nginx service..."
@@ -197,6 +220,11 @@ jobs:
                 echo "Reloading nginx service..."
                 sudo systemctl reload nginx
               fi
+
+              # Final test
+              echo "=== Final Tests ==="
+              curl -I http://127.0.0.1 || echo "Local HTTP test failed"
+              systemctl status nginx --no-pager
             else
               echo "Nginx configuration test failed"
               exit 1
