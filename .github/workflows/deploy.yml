@@ -47,6 +47,7 @@ jobs:
             php artisan config:cache
             php artisan route:cache
             php artisan view:cache
+            php artisan optimize:clear
 
             # Optional: Clear opcache if using PHP-FPM
             echo "Restarting PHP-FPM to clear opcache..."
