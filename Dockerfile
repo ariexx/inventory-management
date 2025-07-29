@@ -4,7 +4,8 @@ FROM php:8.2-fpm
 RUN apt-get update && apt-get install -y \
     git curl libpng-dev libonig-dev libxml2-dev zip unzip libzip-dev \
     mariadb-client nodejs npm \
-    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
+    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
@@ -27,27 +28,23 @@ RUN npm run build
 # Clean up node_modules
 RUN rm -rf node_modules
 
-# Set permissions
+# Create .env from example if it doesn't exist
+RUN if [ ! -f .env ]; then cp .env.example .env; fi
+
+# Set permissions - critical for PHP-FPM
 RUN chown -R www-data:www-data /var/www \
     && chmod -R 755 /var/www/storage \
     && chmod -R 755 /var/www/bootstrap/cache
 
-# Configure PHP-FPM to listen on port 9000
-RUN echo '[global]' > /usr/local/etc/php-fpm.conf \
-    && echo 'error_log = /proc/self/fd/2' >> /usr/local/etc/php-fpm.conf \
-    && echo '[www]' >> /usr/local/etc/php-fpm.conf \
-    && echo 'user = www-data' >> /usr/local/etc/php-fpm.conf \
-    && echo 'group = www-data' >> /usr/local/etc/php-fpm.conf \
-    && echo 'listen = 0.0.0.0:9000' >> /usr/local/etc/php-fpm.conf \
-    && echo 'listen.mode = 0666' >> /usr/local/etc/php-fpm.conf \
-    && echo 'pm = dynamic' >> /usr/local/etc/php-fpm.conf \
-    && echo 'pm.max_children = 20' >> /usr/local/etc/php-fpm.conf \
-    && echo 'pm.start_servers = 3' >> /usr/local/etc/php-fpm.conf \
-    && echo 'pm.min_spare_servers = 2' >> /usr/local/etc/php-fpm.conf \
-    && echo 'pm.max_spare_servers = 4' >> /usr/local/etc/php-fpm.conf \
-    && echo 'pm.max_requests = 200' >> /usr/local/etc/php-fpm.conf \
-    && echo 'catch_workers_output = yes' >> /usr/local/etc/php-fpm.conf \
-    && echo 'access.log = /proc/self/fd/2' >> /usr/local/etc/php-fpm.conf
+# Don't override the default PHP-FPM config completely
+# Just add our custom pool configuration
+RUN echo '; Custom PHP-FPM pool configuration' >> /usr/local/etc/php-fpm.d/zz-docker.conf \
+    && echo 'pm.max_children = 20' >> /usr/local/etc/php-fpm.d/zz-docker.conf \
+    && echo 'pm.start_servers = 3' >> /usr/local/etc/php-fpm.d/zz-docker.conf \
+    && echo 'pm.min_spare_servers = 2' >> /usr/local/etc/php-fpm.d/zz-docker.conf \
+    && echo 'pm.max_spare_servers = 4' >> /usr/local/etc/php-fpm.d/zz-docker.conf \
+    && echo 'pm.max_requests = 200' >> /usr/local/etc/php-fpm.d/zz-docker.conf \
+    && echo 'catch_workers_output = yes' >> /usr/local/etc/php-fpm.d/zz-docker.conf
 
 EXPOSE 9000
 CMD ["php-fpm"]

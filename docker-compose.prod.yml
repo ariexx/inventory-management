@@ -11,6 +11,7 @@ services:
     volumes:
       - ./storage:/var/www/storage:delegated
       - ./bootstrap/cache:/var/www/bootstrap/cache:delegated
+      - ./.env:/var/www/.env:ro
     environment:
       - APP_ENV=production
       - CONTAINER_ROLE=app
@@ -19,6 +20,12 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "php-fpm-healthcheck || nc -z 127.0.0.1 9000 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   mysql:
     image: mysql:8.0
@@ -36,11 +43,12 @@ services:
     networks:
       - inventory_network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_password_123"]
       timeout: 20s
       retries: 10
       interval: 10s
       start_period: 40s
+    command: --default-authentication-plugin=mysql_native_password
 
 volumes:
   mysql_data:

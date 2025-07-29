@@ -102,52 +102,78 @@ jobs:
             sed -i 's|DB_PASSWORD=.*|DB_PASSWORD=your_secure_password|' .env
             sed -i 's|SESSION_SECURE_COOKIE=.*|SESSION_SECURE_COOKIE=true|' .env
 
-            # Start containers
-            docker-compose -f docker-compose.prod.yml up -d --build
+            # Start containers with better error handling
+            echo "=== Building and Starting Containers ==="
+            if ! docker-compose -f docker-compose.prod.yml up -d --build; then
+              echo "Failed to start containers, checking logs..."
+              docker-compose -f docker-compose.prod.yml logs
+              exit 1
+            fi
 
-            # Wait for MySQL to be ready
-            echo "=== Waiting for MySQL to be ready ==="
-            docker-compose -f docker-compose.prod.yml exec -T mysql sh -c 'while ! mysqladmin ping -h localhost --silent; do sleep 1; done'
+            # Wait for containers to be healthy with better timeout
+            echo "=== Waiting for containers to be healthy ==="
+            for i in {1..60}; do
+              if docker-compose -f docker-compose.prod.yml ps | grep -q "healthy"; then
+                echo "Containers are healthy"
+                break
+              fi
+              echo "Waiting for containers to be healthy... ($i/60)"
+              sleep 5
+            done
 
-            echo "=== Generating Laravel Key ==="
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan key:generate --force
+            # Check if containers are actually running
+            echo "=== Checking Container Status ==="
+            docker-compose -f docker-compose.prod.yml ps
 
-            echo "=== Running Database Migrations ==="
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan migrate --force
+            # Only proceed if app container is running
+            if ! docker-compose -f docker-compose.prod.yml exec -T app echo "Container is responsive" 2>/dev/null; then
+              echo "=== Container not responsive, checking logs ==="
+              docker-compose -f docker-compose.prod.yml logs app
+              echo "=== Attempting to restart containers ==="
+              docker-compose -f docker-compose.prod.yml restart app
+              sleep 30
+            fi
 
-            echo "=== Clearing and Caching Config ==="
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan config:clear
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan config:cache
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan route:cache
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan view:cache
+            # Laravel setup with better error handling
+            echo "=== Setting up Laravel Application ==="
 
-            echo "=== Setting Storage Permissions ==="
-            docker-compose -f docker-compose.prod.yml exec -T app chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
-            docker-compose -f docker-compose.prod.yml exec -T app chmod -R 775 /var/www/storage /var/www/bootstrap/cache
+            # Generate Laravel Key
+            if docker-compose -f docker-compose.prod.yml exec -T app php artisan key:generate --force; then
+              echo "Laravel key generated successfully"
+            else
+              echo "Failed to generate Laravel key, trying alternative method..."
+              docker-compose -f docker-compose.prod.yml exec -T app php -r "echo 'base64:'.base64_encode(random_bytes(32));" > /tmp/key
+              if [ -s /tmp/key ]; then
+                APP_KEY=$(cat /tmp/key)
+                sed -i "s|APP_KEY=.*|APP_KEY=$APP_KEY|" .env
+                echo "Laravel key set manually"
+              fi
+            fi
 
-            # Debug: Check container status
-            echo "=== Container Status ==="
-            docker ps -a
+            # Database operations with retries
+            echo "=== Database Setup ==="
+            for i in {1..3}; do
+              if docker-compose -f docker-compose.prod.yml exec -T app php artisan migrate --force; then
+                echo "Database migration completed"
+                break
+              else
+                echo "Migration attempt $i failed, retrying..."
+                sleep 10
+              fi
+            done
 
-            # Debug: Check PHP-FPM logs
-            echo "=== PHP-FPM Logs ==="
-            docker logs inventory_app --tail 50
-
-            echo "=== Container Health Check ==="
-            docker-compose -f docker-compose.prod.yml exec -T app php --version || echo "PHP not working"
-            docker-compose -f docker-compose.prod.yml exec -T app ls -la /var/www/.env || echo ".env not found"
-
-            # Debug: Test PHP-FPM port
-            echo "=== Testing PHP-FPM Connection ==="
-            timeout 10 bash -c 'until nc -z 127.0.0.1 9000; do sleep 1; done' && echo "PHP-FPM is ready" || echo "PHP-FPM connection failed"
-
-            # Run Laravel commands with better error handling
-            echo "=== Running Laravel Commands ==="
-            docker-compose -f docker-compose.prod.yml exec -T app php artisan migrate --force || echo "Migration failed"
+            # Cache optimization
+            echo "=== Cache Optimization ==="
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan config:clear || echo "Config clear failed"
             docker-compose -f docker-compose.prod.yml exec -T app php artisan config:cache || echo "Config cache failed"
             docker-compose -f docker-compose.prod.yml exec -T app php artisan route:cache || echo "Route cache failed"
             docker-compose -f docker-compose.prod.yml exec -T app php artisan view:cache || echo "View cache failed"
             docker-compose -f docker-compose.prod.yml exec -T app php artisan storage:link || echo "Storage link failed"
+
+            # Set final permissions
+            echo "=== Setting Final Permissions ==="
+            docker-compose -f docker-compose.prod.yml exec -T app chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache || echo "Permission setting failed"
+            docker-compose -f docker-compose.prod.yml exec -T app chmod -R 775 /var/www/storage /var/www/bootstrap/cache || echo "Chmod failed"
 
             # Remove any existing nginx config
             sudo rm -f /etc/nginx/sites-enabled/inventory-management.shop
@@ -256,5 +282,3 @@ jobs:
             echo "Nginx error logs:"
             sudo tail -20 /var/log/nginx/inventory_error.log || echo "No nginx errors yet"
 
-            # Set final permissions
-            sudo chown -R www-data:www-data $PROJECT_DIR/storage $PROJECT_DIR/bootstrap/cache
