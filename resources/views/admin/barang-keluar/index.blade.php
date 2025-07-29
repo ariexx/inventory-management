@@ -52,7 +52,9 @@
                         <th width="10%">Jumlah</th>
                         <th width="15%">Tujuan</th>
                         <th width="15%">Tanggal</th>
-                        <th width="20%">Aksi</th>
+                        @if(auth()->user()->is_admin())
+                            <th width="10%">Aksi</th>
+                        @endif
                     </tr>
                     </thead>
                     <tbody>
@@ -64,23 +66,24 @@
                             <td>{{ $item->jumlah }}</td>
                             <td>{{ $item->tujuan ?? '-' }}</td>
                             <td>{{ \Carbon\Carbon::parse($item->tanggal)->format('d M Y') }}</td>
-                            <td>
-                                @if(auth()->user()->is_admin())
-                                    <a href="{{ route('admin.barang-keluar.show', $item->id) }}" class="btn btn-info btn-sm">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                    <a href="{{ route('admin.barang-keluar.edit', $item->id) }}" class="btn btn-warning btn-sm">
-                                        <i class="fas fa-edit"></i>
-                                    </a>
-                                    <form action="{{ route('admin.barang-keluar.destroy', $item->id) }}" method="POST" class="d-inline" onsubmit="return confirmDelete()">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-danger btn-sm">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </form>
-                                @endif
-                            </td>
+                            @if(auth()->user()->is_admin())
+                                <td>
+                                        <a href="{{ route('admin.barang-keluar.show', $item->id) }}" class="btn btn-info btn-sm">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{{ route('admin.barang-keluar.edit', $item->id) }}" class="btn btn-warning btn-sm">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <form action="{{ route('admin.barang-keluar.destroy', $item->id) }}" method="POST" class="d-inline" onsubmit="return confirmDelete()">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-danger btn-sm">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                </td>
+                            @endif
+
                         </tr>
                     @empty
                         <tr>

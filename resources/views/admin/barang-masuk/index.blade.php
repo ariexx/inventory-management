@@ -66,23 +66,23 @@
                             <td>{{ $item->jumlah }}</td>
                             <td>{{ $item->supplier->nama ?? 'N/A' }}</td>
                             <td>{{ \Carbon\Carbon::parse($item->tanggal)->format('d M Y') }}</td>
-                            <td>
-                                @if(auth()->user()->is_admin())
-                                    <a href="{{ route('admin.barang-masuk.show', $item->id) }}" class="btn btn-info btn-sm">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                    <a href="{{ route('admin.barang-masuk.edit', $item->id) }}" class="btn btn-warning btn-sm">
-                                        <i class="fas fa-edit"></i>
-                                    </a>
-                                    <form action="{{ route('admin.barang-masuk.destroy', $item->id) }}" method="POST" class="d-inline" onsubmit="return confirmDelete()">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-danger btn-sm">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </form>
-                                @endif
-                            </td>
+                            @if(auth()->user()->is_admin())
+                                <td>
+                                        <a href="{{ route('admin.barang-masuk.show', $item->id) }}" class="btn btn-info btn-sm">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{{ route('admin.barang-masuk.edit', $item->id) }}" class="btn btn-warning btn-sm">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <form action="{{ route('admin.barang-masuk.destroy', $item->id) }}" method="POST" class="d-inline" onsubmit="return confirmDelete()">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-danger btn-sm">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                </td>
+                            @endif
                         </tr>
                     @empty
                         <tr>
